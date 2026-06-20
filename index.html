@@ -96,6 +96,7 @@
   }
   .chip:active{transform:scale(.96);}
   .chip.inc{background:var(--inc-bg); border-color:var(--inc-bd); color:var(--inc); font-weight:700;}
+  .chip.inrange{background:var(--inc-bg); border-color:var(--inc-bd); color:var(--inc);}
   .chip.exc{background:var(--exc-bg); border-color:var(--exc-bd); color:var(--exc); font-weight:700; text-decoration:line-through;}
   .chip.sel{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700;}
   .chip.add{border-style:dashed; color:var(--muted);}
@@ -114,7 +115,19 @@
   .btn.ghost{background:var(--card); color:var(--text); border:1px solid var(--line);}
   .btn.danger{background:var(--exc-bg); color:var(--exc); border:1px solid var(--exc-bd);}
   .btn.block{display:block; width:100%; margin-top:10px; padding:14px;}
+  .btn.veto{background:var(--exc-bg); color:var(--exc); border:1px solid var(--exc-bd);}
+  .btn:disabled{opacity:.42; cursor:default;}
+  .btn:disabled:active{transform:none;}
   .btn:active{transform:translateY(1px);}
+  .nameinput{width:150px; flex:0 0 auto; border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:10px; padding:9px 12px; font-size:16px; font-family:inherit;}
+  .votes{margin-top:10px; display:flex; flex-direction:column; gap:6px;}
+  .voterow{display:flex; align-items:center; gap:6px;}
+  .voterow .vn{font-size:13px; color:var(--muted); flex:0 0 auto; min-width:40px; max-width:72px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .vb{flex:1; border:1px solid var(--chip-bd); background:var(--chip); color:var(--chip-tx); border-radius:8px; padding:7px 4px; font-size:13px; cursor:pointer; font-family:inherit;}
+  .vb:active{transform:scale(.96);}
+  .vb.on.like{background:var(--inc-bg); border-color:var(--inc-bd); color:var(--inc); font-weight:700;}
+  .vb.on.ok{background:#fff3df; border-color:#e6c178; color:#b56a08; font-weight:700;}
+  .vb.on.no{background:var(--exc-bg); border-color:var(--exc-bd); color:var(--exc); font-weight:700;}
 
   .scard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:13px 15px; margin-bottom:10px; cursor:pointer;}
   .scard:active{background:var(--bg);}
@@ -191,6 +204,7 @@
   <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
   <div id="filters"></div>
   <label class="switchrow"><span>避開最近吃過的 🔁</span><input type="checkbox" id="avoidToggle"></label>
+  <label class="switchrow"><span>排除有人「不喜歡」的店 🙅</span><input type="checkbox" id="dislikeToggle"></label>
 </section>
 
 <!-- 決定列（固定底部） -->
@@ -252,42 +266,48 @@
 const KEY = "eat-what-data";
 const CATS = [
   {key:"staple",  label:"主食", multi:true},
-  {key:"cuisine", label:"菜系", multi:false},
-  {key:"flavor",  label:"口味", multi:false},
+  {key:"cuisine", label:"菜系", multi:true},
   {key:"meals",   label:"餐別", multi:true},
   {key:"distance",label:"距離", multi:false},
   {key:"price",   label:"價位", multi:false},
-  {key:"customTags", label:"自訂標籤", multi:true},
 ];
 const CAT_LABEL = Object.fromEntries(CATS.map(c=>[c.key,c.label]));
 const DEFAULT_TAGS = {
-  staple:["麵","飯","麵包","火鍋","其他"],
-  cuisine:["台式","日式","韓式","中式","西式","美式","東南亞","其他"],
-  flavor:["清淡","適中","重口味"],
+  staple:["麵","飯","鍋物","麵食","其他"],
+  cuisine:["中式","西式","日式","東南亞","韓式","其他"],
   meals:["早餐","午餐","晚餐","宵夜"],
-  distance:["步行可到","車程5分鐘","車程10分鐘","車程15分鐘","車程20分鐘"],
-  price:["$","$$","$$$"],
-  customTags:[],
+  distance:["步行可到","車程5分鐘內","車程10分鐘內","車程15分鐘內","車程20分鐘內","車程20分鐘以上"],
+  price:["100以內","100~200","200~300","300~500","500以上"],
 };
+const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"太太"}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
 
+// 多值欄位可吃陣列或「、，,/」分隔字串
+function toArr(v){
+  if(Array.isArray(v)) return v.map(x=>String(x).trim()).filter(Boolean);
+  if(v==null) return [];
+  return String(v).split(/[、，,/／|・]+/).map(x=>x.trim()).filter(Boolean);
+}
+function toStr(v){ const x = Array.isArray(v) ? (v.length?v[0]:"") : (v==null?"":v); return String(x).trim(); }
 function normStore(s){
   s = s || {};
+  const pick=(...keys)=>{ for(const k of keys){ const val=s[k]; if(val!=null && val!=="") return val; } return undefined; };
   return {
     id: s.id || uid(),
-    name: String(s.name||"").trim(),
-    staple: Array.isArray(s.staple)? s.staple.slice() : (s.staple? [String(s.staple)] : []),
-    cuisine: s.cuisine||"", flavor: s.flavor||"",
-    meals: Array.isArray(s.meals)? s.meals.slice():[],
-    distance: s.distance||"",
-    price: s.price||"",
-    location: String(s.location||""), note: String(s.note||""),
-    customTags: Array.isArray(s.customTags)? s.customTags.slice():[],
+    name: String(pick("name","餐廳","店名")||"").trim(),
+    staple: toArr(pick("staple","主食")),
+    cuisine: toArr(pick("cuisine","菜系")),
+    meals: toArr(pick("meals","餐別")),
+    distance: toStr(pick("distance","距離")),
+    price: toStr(pick("price","價位")),
+    location: String(pick("location","地址","地點")||""),
+    note: String(pick("note","備註")||""),
+    votes: Array.isArray(s.votes)? [s.votes[0]||"", s.votes[1]||""] : ["",""],
     createdAt: s.createdAt||Date.now(), updatedAt: s.updatedAt||Date.now(),
   };
 }
@@ -304,15 +324,12 @@ function normalize(d){
   out.settings = Object.assign(out.settings, d.settings||{});
   out.settings.avoidRecent = !!out.settings.avoidRecent;
   out.settings.animation = !!out.settings.animation;
+  out.settings.openMaps = out.settings.openMaps!==false;
+  out.settings.excludeDisliked = !!out.settings.excludeDisliked;
+  out.settings.user1 = String(out.settings.user1||"").trim().slice(0,12) || "我";
+  out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "太太";
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
-  syncCustomTagOptions(out);
   return out;
-}
-function syncCustomTagOptions(s){
-  s = s || state;
-  const set = new Set(s.tagOptions.customTags);
-  s.stores.forEach(st => (st.customTags||[]).forEach(t=>set.add(t)));
-  s.tagOptions.customTags = Array.from(set);
 }
 function load(){
   try{ const raw = localStorage.getItem(KEY); return raw ? normalize(JSON.parse(raw)) : defaults(); }
@@ -337,7 +354,7 @@ function reducedMotion(){ try{ return matchMedia("(prefers-reduced-motion: reduc
 function dateStr(){ const d=new Date(); const p=n=>String(n).padStart(2,"0"); return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate()); }
 
 /* ---------- 篩選狀態（僅此次使用，不寫入儲存） ---------- */
-let filters = {staple:{},cuisine:{},flavor:{},meals:{},distance:{},price:{},customTags:{}};
+let filters = {staple:{},cuisine:{},meals:{},distance:{},price:{}};
 function autoMeal(){
   const h = new Date().getHours();
   const m = (h>=5&&h<11)?"早餐":(h>=11&&h<17)?"午餐":(h>=17&&h<22)?"晚餐":"宵夜";
@@ -348,9 +365,20 @@ function cycleFilter(cat, opt){
   const next = cur===1 ? -1 : cur===-1 ? 0 : 1;
   if(next===0) delete filters[cat][opt]; else filters[cat][opt]=next;
 }
-function clearFilters(){ filters={staple:{},cuisine:{},flavor:{},meals:{},distance:{},price:{},customTags:{}}; }
+function clearFilters(){ filters={staple:{},cuisine:{},meals:{},distance:{},price:{}}; }
+// 距離為「最遠可接受」門檻（單選），選 20 分鐘內＝包含步行/5/10/15 分鐘內
+function setDistanceThreshold(opt){ filters.distance = filters.distance[opt] ? {} : {[opt]:1}; }
 function matchesFilters(store){
   for(const cat of CATS){
+    if(cat.key==="distance"){
+      const sel = Object.keys(filters.distance)[0];
+      if(sel){
+        const order = state.tagOptions.distance;
+        const r = order.indexOf(store.distance);
+        if(r<0 || r>order.indexOf(sel)) return false;
+      }
+      continue;
+    }
     const fmap = filters[cat.key]; const inc=[], exc=[];
     for(const o in fmap){ if(fmap[o]===1) inc.push(o); else if(fmap[o]===-1) exc.push(o); }
     if(!inc.length && !exc.length) continue;
@@ -381,6 +409,17 @@ function renderFilters(){
   for(const cat of CATS){
     const opts = state.tagOptions[cat.key]||[];
     if(cat.key==="customTags" && opts.length===0) continue;
+    if(cat.key==="distance"){
+      const sel = Object.keys(filters.distance)[0];
+      const selIdx = sel ? opts.indexOf(sel) : -1;
+      const dchips = opts.map((o,i)=>{
+        const cls = selIdx<0 ? "chip" : (i===selIdx ? "chip inc" : (i<selIdx ? "chip inrange" : "chip"));
+        const mark = (selIdx>=0 && i<=selIdx) ? "✓ " : "";
+        return `<button class="${cls}" data-cat="distance" data-opt="${esc(o)}">${mark}${esc(o)}</button>`;
+      }).join("");
+      html += `<div class="fgroup"><div class="fglabel">距離 <span class="muted">（選最遠可接受，含更近的）</span></div><div class="chips">${dchips}</div></div>`;
+      continue;
+    }
     const chips = opts.map(o=>{
       const st = filters[cat.key][o];
       const cls = st===1?"chip inc":st===-1?"chip exc":"chip";
@@ -391,8 +430,13 @@ function renderFilters(){
   }
   $("#filters").innerHTML = html;
 }
+function currentCandidates(){
+  let c = state.stores.filter(matchesFilters);
+  if(state.settings.excludeDisliked) c = c.filter(s=> (s.votes||[]).indexOf("no")<0);
+  return c;
+}
 function updateCount(){
-  const n = state.stores.filter(matchesFilters).length;
+  const n = currentCandidates().length;
   const el = $("#count");
   el.innerHTML = `目前符合 <b>${n}</b> 間`;
   el.classList.toggle("zero", n===0 && state.stores.length>0);
@@ -400,11 +444,15 @@ function updateCount(){
 function renderHome(){
   renderFilters();
   $("#avoidToggle").checked = state.settings.avoidRecent;
+  $("#dislikeToggle").checked = state.settings.excludeDisliked;
   updateCount();
 }
 
 /* ---------- 隨機抽選 ---------- */
 let currentList=[], currentRelaxed=false, currentPick=null;
+let vetoUsed={}, vetoedIds=[], vetoDisabled=[false,false]; // 兩人否決權：每輪每人各一次
+function resetRound(){ vetoUsed={}; vetoedIds=[]; }
+function userNames(){ return [ state.settings.user1||"我", state.settings.user2||"太太" ]; }
 function applyAvoid(cands){
   if(!state.settings.avoidRecent) return {list:cands, relaxed:false};
   const recent = state.log.slice(0, state.settings.avoidWindow).map(x=>x.id);
@@ -412,38 +460,58 @@ function applyAvoid(cands){
   if(filtered.length===0) return {list:cands, relaxed:true};
   return {list:filtered, relaxed:false};
 }
-function pickFrom(list, avoidId){
-  let pool = list;
-  if(list.length>1 && avoidId) pool = list.filter(s=>s.id!==avoidId);
+function pickFrom(list, avoidIds){
+  avoidIds = avoidIds || [];
+  let pool = list.filter(s=>avoidIds.indexOf(s.id)<0);
   if(pool.length===0) pool = list;
   return pool[Math.floor(Math.random()*pool.length)];
 }
 function decide(){
   if(state.stores.length===0){ openResultEmpty("noStore"); return; }
-  const cands = state.stores.filter(matchesFilters);
+  const cands = currentCandidates();
   if(cands.length===0){ openResultEmpty("noMatch"); return; }
   const {list, relaxed} = applyAvoid(cands);
-  openResult(list, relaxed, null);
+  resetRound();
+  openResult(list, relaxed);
 }
-function openResult(list, relaxed, avoidId){
+function openResult(list, relaxed){
   currentList=list; currentRelaxed=relaxed;
-  const pick = pickFrom(list, avoidId);
+  const pick = pickFrom(list, vetoedIds);
   currentPick = pick;
   const animate = state.settings.animation && !reducedMotion() && list.length>1;
+  const u = userNames();
+  // 否決後是否還有「不同的店」可以換
+  const remaining = list.filter(s=> vetoedIds.indexOf(s.id)<0 && s.id!==pick.id).length;
+  const noMore = remaining===0;
+  vetoDisabled = [ !!vetoUsed[0] || noMore, !!vetoUsed[1] || noMore ];
+  const vbtn = (i)=>{
+    const used = !!vetoUsed[i];
+    const label = used ? esc(u[i])+"（已換過）" : "🙅 "+esc(u[i])+" 不喜歡";
+    return `<button class="btn veto" id="veto${i}" ${vetoDisabled[i]?"disabled":""}>${label}</button>`;
+  };
+  const noMoreNote = (noMore && (!vetoUsed[0] || !vetoUsed[1]))
+    ? '<div class="relaxnote">沒有更多可以換的店了，就從這裡決定吧 🙂</div>' : '';
   $("#resultBody").innerHTML = `
     ${relaxed?'<div class="relaxnote">符合的店最近都吃過了，已暫時不避開最近紀錄 🙂</div>':''}
+    ${noMoreNote}
     <div class="result-card">
       <div class="r-eyebrow">今天就吃…</div>
       <div id="r-name"${animate?' class="spin"':''}>${esc(pick.name)}</div>
       <div class="r-info" id="r-info"></div>
     </div>
     <div class="formbtns" style="margin-top:18px">
-      <button class="btn ghost" id="rerollBtn">🔁 再抽一次</button>
-      <button class="btn primary" id="acceptBtn">就吃這間！</button>
+      ${vbtn(0)}
+      ${vbtn(1)}
     </div>
-    <button class="linkbtn" id="resultClose" style="display:block;margin:12px auto 0">關閉</button>`;
-  $("#rerollBtn").onclick = ()=> openResult(currentList, currentRelaxed, currentPick&&currentPick.id);
+    <button class="btn primary" id="acceptBtn" style="width:100%; margin-top:10px; padding:16px; font-size:18px">就吃這間！</button>
+    <div style="display:flex; gap:18px; justify-content:center; margin-top:12px">
+      <button class="linkbtn" id="mapBtn">🗺️ 看地圖</button>
+      <button class="linkbtn" id="resultClose">關閉</button>
+    </div>`;
+  $("#veto0").onclick = ()=> vetoPick(0);
+  $("#veto1").onclick = ()=> vetoPick(1);
   $("#acceptBtn").onclick = acceptPick;
+  $("#mapBtn").onclick = ()=> openMaps(currentPick);
   $("#resultClose").onclick = closeResult;
   showModal("#resultModal");
   if(animate){
@@ -456,7 +524,19 @@ function openResult(list, relaxed, avoidId){
     renderResultInfo(pick);
   }
 }
-function setButtonsDisabled(d){ ["#rerollBtn","#acceptBtn"].forEach(s=>{const b=$(s); if(b) b.disabled=d;}); }
+function vetoPick(i){
+  if(!currentPick || vetoUsed[i] || vetoDisabled[i]) return;
+  vetoUsed[i] = true;
+  if(vetoedIds.indexOf(currentPick.id)<0) vetoedIds.push(currentPick.id);
+  const who = userNames()[i];
+  openResult(currentList, currentRelaxed);
+  toast(who+"不喜歡，換一間！");
+}
+function setButtonsDisabled(d){
+  const acc=$("#acceptBtn"); if(acc) acc.disabled=d;
+  const v0=$("#veto0"); if(v0) v0.disabled = d || vetoDisabled[0];
+  const v1=$("#veto1"); if(v1) v1.disabled = d || vetoDisabled[1];
+}
 function runSlot(names, finalName, done){
   const el = $("#r-name");
   let delay=45, elapsed=0; const total=850;
@@ -470,22 +550,25 @@ function runSlot(names, finalName, done){
 function renderResultInfo(s){
   const rows=[];
   const add=(k,v)=>{ if(v) rows.push(`<div class="ri"><span class="k">${k}</span><span>${esc(v)}</span></div>`); };
-  add("主食", (s.staple||[]).join("、")); add("菜系", s.cuisine); add("口味", s.flavor);
+  add("主食", (s.staple||[]).join("、")); add("菜系", (s.cuisine||[]).join("、"));
   add("餐別", (s.meals||[]).join("、")); add("距離", s.distance); add("價位", s.price);
   add("地點", s.location); add("備註", s.note);
-  if(s.customTags && s.customTags.length){
-    rows.push(`<div class="ri"><span class="k">標籤</span><span class="tags">${s.customTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</span></div>`);
-  }
   $("#r-info").innerHTML = rows.join("") || '<div class="ri"><span class="k">　</span><span class="k">（沒有其他資訊）</span></div>';
 }
+function mapsUrl(store){
+  const q = [store.name, store.location, "台中"].filter(Boolean).join(" ");
+  return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(q);
+}
+function openMaps(store){ if(store){ try{ window.open(mapsUrl(store), "_blank"); }catch(e){} } }
 function acceptPick(){
   if(!currentPick) return;
-  state.log.unshift({id:currentPick.id, name:currentPick.name, ts:Date.now()});
+  const pick = currentPick;
+  state.log.unshift({id:pick.id, name:pick.name, ts:Date.now()});
   if(state.log.length>365) state.log.length=365;
   save();
-  const nm = currentPick.name;
+  if(state.settings.openMaps) openMaps(pick); // 須在點擊事件中呼叫，避免被瀏覽器擋彈窗
   closeResult();
-  toast("好的，就吃「"+nm+"」🍽️");
+  toast("好的，就吃「"+pick.name+"」🍽️");
 }
 function openResultEmpty(kind){
   const msg = kind==="noStore"
@@ -502,32 +585,39 @@ function closeResult(){ hideModal("#resultModal"); }
 
 /* ---------- 店家清單 ---------- */
 function storeMetaLine(s){
-  return [s.cuisine, (s.staple||[]).join("/"), s.flavor, s.price].filter(Boolean).join(" · ");
+  return [(s.cuisine||[]).join("/"), (s.staple||[]).join("/"), s.price].filter(Boolean).join(" · ");
 }
 function renderStores(){
   const q = ($("#storeSearch").value||"").trim().toLowerCase();
   let list = state.stores.slice().sort((a,b)=>a.name.localeCompare(b.name,"zh-Hant"));
-  if(q) list = list.filter(s=> (s.name+" "+(s.customTags||[]).join(" ")+" "+s.cuisine+" "+(s.staple||[]).join(" ")+" "+s.distance).toLowerCase().includes(q));
+  if(q) list = list.filter(s=> (s.name+" "+(s.cuisine||[]).join(" ")+" "+(s.staple||[]).join(" ")+" "+s.distance+" "+(s.note||"")).toLowerCase().includes(q));
   const wrap = $("#storeList");
   if(state.stores.length===0){
     wrap.innerHTML = `<div class="empty"><span class="big">🏪</span>還沒有店家<br>點右上角「＋ 新增」，<br>或到「設定」帶入在地起始店家。</div>`;
     return;
   }
   if(list.length===0){ wrap.innerHTML = `<div class="empty">找不到符合「${esc(q)}」的店家</div>`; return; }
+  const u = userNames();
   wrap.innerHTML = list.map(s=>{
     const meals = (s.meals||[]).length ? `<span class="tag">${s.meals.join("/")}</span>` : "";
-    const ctags = (s.customTags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+    const votes = s.votes || ["",""];
+    const vrow = (i)=>{
+      const cur = votes[i]||"";
+      const b = (val,cls,txt)=>`<button class="vb ${cls} ${cur===val?"on":""}" data-id="${s.id}" data-voter="${i}" data-val="${val}">${txt}</button>`;
+      return `<div class="voterow"><span class="vn">${esc(u[i])}</span>${b("like","like","喜歡")}${b("ok","ok","普通")}${b("no","no","不喜歡")}</div>`;
+    };
     return `<div class="scard" data-id="${s.id}">
       <div class="nm">${esc(s.name)}</div>
       <div class="meta">${esc(storeMetaLine(s))}${s.distance? " · "+esc(s.distance):""}</div>
-      ${(meals||ctags)?`<div class="tags">${meals}${ctags}</div>`:""}
+      ${meals?`<div class="tags">${meals}</div>`:""}
+      <div class="votes">${vrow(0)}${vrow(1)}</div>
     </div>`;
   }).join("");
 }
 
 /* ---------- 店家表單 ---------- */
 let formStore=null, editingId=null;
-function blankStore(){ return {id:"",name:"",staple:[],cuisine:"",flavor:"",meals:[],distance:"",price:"",location:"",note:"",customTags:[]}; }
+function blankStore(){ return {id:"",name:"",staple:[],cuisine:[],meals:[],distance:"",price:"",location:"",note:"",votes:["",""]}; }
 function openForm(store){
   editingId = store ? store.id : null;
   formStore = store ? JSON.parse(JSON.stringify(store)) : blankStore();
@@ -548,15 +638,8 @@ function renderFormGroups(){
     }).join("");
     const sub = cat.multi ? '<span class="muted">（可多選）</span>' : "";
     return `<div class="field"><label class="flbl">${cat.label} ${sub}</label>
-      <div class="chips">${chips}<button type="button" class="chip add" data-add="${cat.key}">＋ 新增</button></div></div>`;
+      <div class="chips">${chips}</div></div>`;
   }).join("");
-}
-function addOption(catKey){
-  const v = (prompt("新增「"+CAT_LABEL[catKey]+"」選項：")||"").trim();
-  if(!v) return;
-  if(!state.tagOptions[catKey].includes(v)) state.tagOptions[catKey].push(v);
-  save();
-  renderFormGroups();
 }
 function saveForm(){
   formStore.name = ($("#f-name").value||"").trim();
@@ -571,7 +654,6 @@ function saveForm(){
     formStore.id = uid(); formStore.createdAt = Date.now();
     state.stores.push(formStore);
   }
-  syncCustomTagOptions();
   save();
   hideModal("#formModal");
   renderStores();
@@ -605,12 +687,21 @@ function renderSettings(){
       <div class="row"><div class="lbl">避開最近幾次<small>記住最近 N 次當作「最近吃過」</small></div>
         <div class="stepper"><button id="aw-minus">−</button><b id="aw-val">${st.avoidWindow}</b><button id="aw-plus">＋</button></div></div>
       <div class="row"><div class="lbl">抽選動畫<small>按「決定！」時的老虎機效果</small></div><input type="checkbox" id="set-anim" ${st.animation?"checked":""}></div>
+      <div class="row"><div class="lbl">選定後開啟 Google 地圖<small>按「就吃這間」後自動帶你導航</small></div><input type="checkbox" id="set-maps" ${st.openMaps?"checked":""}></div>
+    </div>
+
+    <div class="sect">
+      <h2>兩位成員（否決／投票用）</h2>
+      <div class="row"><div class="lbl">成員 1 名稱</div><input class="tin nameinput" id="set-user1" type="text" maxlength="8" value="${esc(st.user1||"我")}"></div>
+      <div class="row"><div class="lbl">成員 2 名稱</div><input class="tin nameinput" id="set-user2" type="text" maxlength="8" value="${esc(st.user2||"太太")}"></div>
+      <div class="hint" style="margin:10px 0 4px">這兩個名字會用在：抽選結果的「○○ 不喜歡」否決鈕（每人每輪一次），以及每間店家卡片上的投票（喜歡／普通／不喜歡）。</div>
     </div>
 
     <div class="sect">
       <h2>資料備份</h2>
       <div class="row"><div class="lbl">匯出 JSON<small>下載一份備份檔</small></div><button class="btn ghost" id="btn-export">匯出</button></div>
       <div class="row"><div class="lbl">匯入 JSON<small>從備份檔還原（會覆蓋現有資料）</small></div><button class="btn ghost" id="btn-import">匯入</button></div>
+      <div class="row"><div class="lbl">合併匯入店家<small>加入清單檔的店家，不覆蓋現有資料（重複店名自動略過）</small></div><button class="btn ghost" id="btn-merge">合併</button></div>
       <div class="row"><div class="lbl">重新帶入在地起始店家<small>嶺東／南屯一帶人氣店家</small></div><button class="btn ghost" id="btn-sample">帶入</button></div>
       <div class="row"><div class="lbl" style="color:var(--exc)">清除所有資料<small>店家、設定、紀錄全部清空</small></div><button class="btn danger" id="btn-clear">清除</button></div>
     </div>
@@ -630,10 +721,14 @@ function renderSettings(){
 
   $("#set-avoid").onchange = e=>{ state.settings.avoidRecent=e.target.checked; save(); };
   $("#set-anim").onchange  = e=>{ state.settings.animation=e.target.checked; save(); };
+  $("#set-maps").onchange  = e=>{ state.settings.openMaps=e.target.checked; save(); };
+  $("#set-user1").onchange = e=>{ state.settings.user1=(e.target.value||"").trim().slice(0,8)||"我"; e.target.value=state.settings.user1; save(); };
+  $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"太太"; e.target.value=state.settings.user2; save(); };
   $("#aw-minus").onclick = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow-1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
   $("#aw-plus").onclick  = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow+1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
   $("#btn-export").onclick = exportData;
   $("#btn-import").onclick = ()=> $("#importFile").click();
+  $("#btn-merge").onclick  = ()=> $("#mergeFile").click();
   $("#btn-sample").onclick = loadSamples;
   $("#btn-clear").onclick  = clearAll;
   $$("#settingsBody .del").forEach(b=> b.onclick=()=>{ state.log.splice(parseInt(b.dataset.logi),1); save(); renderSettings(); });
@@ -665,6 +760,30 @@ function importData(file){
   };
   reader.readAsText(file);
 }
+function importMerge(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data) ? data : (Array.isArray(data.stores) ? data.stores : null);
+      if(!incoming) throw new Error("格式不符");
+      const existing = new Set(state.stores.map(s=>(s.name||"").trim()));
+      let added=0, skipped=0;
+      incoming.forEach(s=>{
+        const st = normStore(s);
+        if(!st.name){ return; }
+        if(existing.has(st.name.trim())){ skipped++; return; }
+        st.id = uid(); state.stores.push(st); existing.add(st.name.trim()); added++;
+      });
+      if(data.tagOptions){ for(const k of Object.keys(DEFAULT_TAGS)){ const v=data.tagOptions[k]; if(Array.isArray(v)) v.forEach(x=>{ if(state.tagOptions[k].indexOf(x)<0) state.tagOptions[k].push(x); }); } }
+      save();
+      clearFilters(); autoMeal();
+      renderHome(); renderStores(); renderSettings();
+      toast("合併完成：新增 "+added+" 間"+(skipped?("，略過重複 "+skipped+" 間"):""));
+    }catch(e){ alert("合併匯入失敗：這個檔案看起來不是有效的清單 JSON。"); }
+  };
+  reader.readAsText(file);
+}
 function clearAll(){
   if(!confirm("確定要清除所有資料？此動作無法復原（建議先匯出備份）。")) return;
   state = defaults(); save();
@@ -674,25 +793,56 @@ function clearAll(){
 }
 // 嶺東／南屯一帶人氣店家作為起始資料（評價、車程為概估，請依實際情況自行調整）
 const SAMPLE = [
-  {name:"鈞泓家 嶺東店",          staple:["飯","麵包","其他"], cuisine:"台式", flavor:"適中", meals:["早餐","午餐","晚餐","宵夜"], distance:"步行可到", price:"$",   location:"嶺東科大旁", note:"早餐賣到宵夜，學生大推", customTags:["學生愛"]},
-  {name:"朝司暮想",               staple:["麵包"],            cuisine:"台式", flavor:"適中", meals:["早餐","午餐"],            distance:"車程5分鐘",  price:"$",   location:"南屯", note:"銅板價肉蛋吐司，可外送", customTags:["學生愛"]},
-  {name:"成功臭豆腐",             staple:["其他"],            cuisine:"台式", flavor:"重口味", meals:["午餐","晚餐","宵夜"],     distance:"車程5分鐘",  price:"$",   location:"嶺東周邊", note:"酥脆臭豆腐"},
-  {name:"蒸心手工小籠湯包",       staple:["麵","其他"],        cuisine:"中式", flavor:"適中", meals:["早餐","午餐"],            distance:"車程5分鐘",  price:"$",   location:"嶺東周邊", note:"現包小籠湯包"},
-  {name:"饗食拉麵",               staple:["麵"],              cuisine:"日式", flavor:"重口味", meals:["午餐","晚餐"],            distance:"車程5分鐘",  price:"$$",  location:"南屯區忠勇路", note:"牛腩拉麵、麻辣乳酪拉麵", customTags:["學生愛"]},
-  {name:"台客燒肉粥",             staple:["飯","其他"],        cuisine:"台式", flavor:"適中", meals:["早餐","午餐","晚餐"],     distance:"車程10分鐘", price:"$",   location:"捷運南屯站附近", note:"米其林必比登，燒肉粥", customTags:["必比登"]},
-  {name:"南屯蕭爌肉飯",           staple:["飯"],              cuisine:"台式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程10分鐘", price:"$",   location:"南屯市場內", note:"半肥瘦爌肉飯"},
-  {name:"廖記麵線（老街麵線）",   staple:["麵","飯"],          cuisine:"台式", flavor:"適中", meals:["早餐","午餐"],            distance:"車程10分鐘", price:"$",   location:"南屯老街", note:"滷肉飯、陽春麵、朴菜飯"},
-  {name:"田寮農莊",               staple:["飯"],              cuisine:"台式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程10分鐘", price:"$$",  location:"南屯區樂田巷", note:"台式合菜，約 4.6★，低消 $200", customTags:["聚餐"]},
-  {name:"養鍋 石頭涮涮鍋（南屯黎明店）", staple:["火鍋"],      cuisine:"台式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程10分鐘", price:"$$",  location:"南屯區黎明路", note:"蔬菜自助吧吃到飽"},
-  {name:"銀鉤韓式銅盤烤肉涮涮鍋", staple:["火鍋","其他"],      cuisine:"韓式", flavor:"重口味", meals:["午餐","晚餐"],            distance:"車程15分鐘", price:"$$",  location:"大墩商圈", note:"韓式銅盤烤肉、涮涮鍋", customTags:["聚餐","吃到飽"]},
-  {name:"和道屋 居酒屋",          staple:["其他"],            cuisine:"日式", flavor:"重口味", meals:["晚餐","宵夜"],            distance:"車程15分鐘", price:"$$",  location:"公益路二段", note:"20 年老字號居酒屋，營業到凌晨", customTags:["聚餐"]},
-  {name:"雪莉牛排海鮮餐廳",       staple:["飯","其他"],        cuisine:"西式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程15分鐘", price:"$$$", location:"西區存中街", note:"約 4.5★，牛排海鮮，週一公休", customTags:["聚餐"]},
-  {name:"Mr.38 咖哩",            staple:["飯"],              cuisine:"日式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程15分鐘", price:"$",   location:"台中老牌咖哩", note:"大份量、免費續飯續湯", customTags:["學生愛"]},
+  {"name": "肉蛋中西式早餐店 創始店", "staple": ["麵食", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "車程20分鐘以上", "price": "100~200", "note": "中西式早餐；吐司、蛋餅、漢堡類"},
+  {"name": "京都勝牛-台中LaLaport店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "車程20分鐘以上", "price": "300~500", "note": "日式炸牛排定食"},
+  {"name": "吉蜂蒸餃 創始店", "staple": ["麵食", "麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "車程20分鐘以上", "price": "100以內", "note": "蒸餃、湯麵類"},
+  {"name": "盛食咖哩店-勤美店", "staple": ["飯", "麵食"], "cuisine": ["其他"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "200~300", "note": "咖哩飯；部分餐點含炸物／餅皮類"},
+  {"name": "IL Volo pizza義波羅窯烤披薩", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "300~500", "note": "窯烤披薩"},
+  {"name": "石鍋い（石鍋毅）石頭火鍋 逢甲店", "staple": ["鍋物", "飯", "麵"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "車程15分鐘內", "price": "300~500", "note": "石頭火鍋；通常可搭配飯／麵"},
+  {"name": "漢堡王 Burger King 台中J Mall店", "staple": ["麵食", "其他"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "車程10分鐘內", "price": "100~200", "note": "漢堡與速食配餐"},
+  {"name": "大戶屋 台中J Mall店", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "車程10分鐘內", "price": "300~500", "note": "日式定食、丼飯、麵類"},
+  {"name": "麵屋秋鳴", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "200~300", "note": "拉麵與飯類小品"},
+  {"name": "宜家家居 臺中店", "staple": ["飯", "麵食", "其他"], "cuisine": ["西式", "其他"], "meals": ["早餐", "午餐", "晚餐"], "distance": "車程15分鐘內", "price": "100~200", "note": "瑞典餐廳／美食小站；餐點種類多"},
+  {"name": "春梅家（只接受現場候位）", "staple": ["麵", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "200~300", "note": "中式餐點，現場候位"},
+  {"name": "大新火雞肉飯", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "100~200", "note": "火雞肉飯、便當類"},
+  {"name": "捌點玖餐坊", "staple": ["飯", "麵食", "其他"], "cuisine": ["西式", "其他"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "200~300", "note": "餐坊／簡餐類"},
+  {"name": "條條有理", "staple": ["麵", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "100~200", "note": "麵食、飯類餐點"},
+  {"name": "太初麵食", "staple": ["麵", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "車程15分鐘內", "price": "100~200", "note": "麵食為主，部分飯類"},
+  {"name": "小樹田自助餐", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "車程15分鐘內", "price": "100~200", "note": "自助餐／便當"},
+  {"name": "四海豆漿", "staple": ["麵食", "飯"], "cuisine": ["中式"], "meals": ["早餐", "宵夜"], "distance": "車程5分鐘內", "price": "100以內", "note": "豆漿、燒餅、飯糰、蛋餅類"},
+  {"name": "肯德基KFC-台中五權西二餐廳", "staple": ["麵食", "其他"], "cuisine": ["西式"], "meals": ["早餐", "午餐", "晚餐", "宵夜"], "distance": "車程10分鐘內", "price": "100~200", "note": "炸雞速食；部分門市早餐"},
+  {"name": "御記烤鴨｜UJ風味館 向上門市", "staple": ["飯", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "車程5分鐘內", "price": "200~300", "note": "烤鴨、合菜／外帶餐點"},
+  {"name": "羅家古早味", "staple": ["飯", "麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "車程5分鐘內", "price": "100~200", "note": "古早味小吃、飯麵類"},
+  {"name": "向上清粥小菜", "staple": ["飯", "其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "車程5分鐘內", "price": "200~300", "note": "清粥小菜，粥歸入其他"},
+  {"name": "七原香日式咖哩", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "車程10分鐘內", "price": "100~200", "note": "日式咖哩飯、烏龍麵類"},
+  {"name": "麥味登南屯忠勇店", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "步行可到", "price": "100~200", "note": "連鎖早午餐"},
+  {"name": "呷潤餅（南屯店）忠勇路", "staple": ["麵食", "其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100以內", "note": "潤餅類"},
+  {"name": "八廚職人弁当 台中忠勇店", "staple": ["飯"], "cuisine": ["日式", "中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100~200", "note": "便當／弁当"},
+  {"name": "益 清水米糕-忠勇店", "staple": ["飯", "麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100以內", "note": "米糕、麵類小吃"},
+  {"name": "早安美芝城台中忠勇", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "步行可到", "price": "100~200", "note": "連鎖早餐"},
+  {"name": "港式滷味", "staple": ["麵", "其他"], "cuisine": ["中式"], "meals": ["晚餐", "宵夜"], "distance": "步行可到", "price": "100~200", "note": "滷味可搭配麵食"},
+  {"name": "八方雲集 台中忠勇店", "staple": ["麵食", "麵", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100以內", "note": "鍋貼水餃、麵、飯"},
+  {"name": "澄食晨食忠勇店", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "步行可到", "price": "100~200", "note": "早午餐"},
+  {"name": "市政爌肉飯（忠勇店）", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100以內", "note": "爌肉飯"},
+  {"name": "憨堡 Humblger", "staple": ["麵食", "其他"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "車程5分鐘內", "price": "200~300", "note": "漢堡類"},
+  {"name": "傳香飯糰", "staple": ["飯"], "cuisine": ["中式"], "meals": ["早餐"], "distance": "步行可到", "price": "100以內", "note": "飯糰早餐"},
+  {"name": "宮本武丼｜直火燒肉丼｜台中嶺東店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100~200", "note": "燒肉丼飯"},
+  {"name": "寬心丸水餃", "staple": ["麵食", "麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100~200", "note": "水餃與麵類"},
+  {"name": "早安美芝城台中嶺東概念店", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "步行可到", "price": "100~200", "note": "連鎖早餐／早午餐"},
+  {"name": "艾初早餐 嶺東精科店", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "步行可到", "price": "100~200", "note": "早午餐"},
+  {"name": "阿鍋家-鍋燒煮義（嶺東店）", "staple": ["麵", "鍋物", "飯"], "cuisine": ["中式", "其他"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100~200", "note": "鍋燒麵、義麵／飯類"},
+  {"name": "台客大食館（原台客燒肉粥）", "staple": ["飯", "麵", "其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "步行可到", "price": "100~200", "note": "燒肉粥、飯麵類"},
+  {"name": "鹿港老堯師肉包", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "車程5分鐘內", "price": "100以內", "note": "肉包、饅頭類"},
+  {"name": "燒瓶子・大肆の鍋 台中南屯店", "staple": ["鍋物", "飯", "麵"], "cuisine": ["中式", "日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "車程10分鐘內", "price": "300~500", "note": "個人鍋／火鍋"},
+  {"name": "述憶灶咖 早午餐.私廚.外燴", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "車程5分鐘內", "price": "100~200", "note": "早午餐、私廚外燴"},
+  {"name": "順柔烏龍麵（うどん しなやか）飯類／烏冬", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "車程5分鐘內", "price": "100~200", "note": "烏龍麵、飯類"},
+  {"name": "泰辣小吃（泰式料理）", "staple": ["飯", "麵"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "車程5分鐘內", "price": "100~200", "note": "泰式料理"},
+  {"name": "蒸旺手工小籠湯包", "staple": ["麵食", "麵"], "cuisine": ["中式"], "meals": ["晚餐", "宵夜"], "distance": "車程5分鐘內", "price": "100以內", "note": "小籠湯包，晚上營業到售完"}
 ];
 function loadSamples(){
   if(state.stores.length>0 && !confirm("會在現有店家後面加入 "+SAMPLE.length+" 間在地起始店家，確定嗎？")) return;
   SAMPLE.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
-  syncCustomTagOptions(); save();
+  save();
   renderStores();
   toast("已加入 "+SAMPLE.length+" 間在地起始店家");
   switchTab("stores");
@@ -707,20 +857,29 @@ $$("nav.tabbar button").forEach(b=> b.onclick=()=>switchTab(b.dataset.tab));
 $("#decideBtn").onclick = decide;
 $("#clearFilters").onclick = ()=>{ clearFilters(); renderHome(); };
 $("#avoidToggle").onchange = e=>{ state.settings.avoidRecent=e.target.checked; save(); };
+$("#dislikeToggle").onchange = e=>{ state.settings.excludeDisliked=e.target.checked; save(); updateCount(); };
 $("#filters").addEventListener("click", e=>{
   const b = e.target.closest(".chip"); if(!b) return;
-  cycleFilter(b.dataset.cat, b.dataset.opt);
+  if(b.dataset.cat==="distance") setDistanceThreshold(b.dataset.opt);
+  else cycleFilter(b.dataset.cat, b.dataset.opt);
   renderFilters(); updateCount();
 });
 $("#addStoreBtn").onclick = ()=> openForm(null);
 $("#storeSearch").addEventListener("input", renderStores);
 $("#storeList").addEventListener("click", e=>{
+  const vb = e.target.closest(".vb");
+  if(vb){ e.stopPropagation(); voteStore(vb.dataset.id, +vb.dataset.voter, vb.dataset.val); return; }
   const card = e.target.closest(".scard"); if(!card) return;
   const s = state.stores.find(x=>x.id===card.dataset.id); if(s) openForm(s);
 });
+function voteStore(id, voter, val){
+  const s = state.stores.find(x=>x.id===id); if(!s) return;
+  if(!Array.isArray(s.votes)) s.votes=["",""];
+  s.votes[voter] = (s.votes[voter]===val) ? "" : val;
+  save();
+  renderStores();
+}
 $("#formGroups").addEventListener("click", e=>{
-  const add = e.target.closest("[data-add]");
-  if(add){ addOption(add.dataset.add); return; }
   const chip = e.target.closest("[data-fcat]");
   if(!chip) return;
   const cat = chip.dataset.fcat, opt = chip.dataset.opt;
@@ -747,12 +906,16 @@ const importInput = document.createElement("input");
 importInput.type="file"; importInput.accept="application/json,.json"; importInput.id="importFile"; importInput.style.display="none";
 importInput.addEventListener("change", e=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=""; });
 document.body.appendChild(importInput);
+const mergeInput = document.createElement("input");
+mergeInput.type="file"; mergeInput.accept="application/json,.json"; mergeInput.id="mergeFile"; mergeInput.style.display="none";
+mergeInput.addEventListener("change", e=>{ const f=e.target.files[0]; if(f) importMerge(f); e.target.value=""; });
+document.body.appendChild(mergeInput);
 
 /* ---------- 啟動 ---------- */
 // 首次開啟自動帶入在地起始店家（嶺東／南屯）；清空資料後就不會再自動帶入
 if(localStorage.getItem(KEY)===null){
   SAMPLE.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
-  syncCustomTagOptions(); save();
+  save();
 }
 autoMeal();
 renderHome();
