@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ff6b35">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="今天吃什麼">
+<title>今天吃什麼？</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+<style>
+  :root{
+    --bg:#f6f5f3; --card:#ffffff; --text:#1f2328; --muted:#7a828c; --line:#e7e3dd;
+    --accent:#ff6b35; --accent-d:#e8590c;
+    --inc:#2f9e44; --inc-bg:#e9f9ee; --inc-bd:#a3e3b6;
+    --exc:#e03131; --exc-bg:#fdecec; --exc-bd:#f4b9b9;
+    --chip:#f0eee9; --chip-bd:#e2ddd4; --chip-tx:#444b53;
+    --shadow:0 6px 24px rgba(0,0,0,.10);
+    --tab-h:60px; --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16181c; --card:#202329; --text:#eceef1; --muted:#9aa2ab; --line:#2c3037;
+      --chip:#2a2e35; --chip-bd:#3a3f47; --chip-tx:#cbd1d8;
+      --inc-bg:#16321f; --inc-bd:#2f6b41; --exc-bg:#3a1b1b; --exc-bd:#7a3636;
+      --shadow:0 6px 24px rgba(0,0,0,.45);
+    }
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--text); font-size:16px; line-height:1.5;
+    padding-bottom:calc(var(--tab-h) + var(--safe-b));
+    max-width:640px; margin:0 auto; min-height:100vh;
+  }
+  header.app{
+    position:sticky; top:0; z-index:20; background:var(--bg);
+    padding:14px 16px 8px; display:flex; align-items:center; gap:8px;
+    border-bottom:1px solid var(--line);
+  }
+  header.app h1{font-size:19px; margin:0; font-weight:800; letter-spacing:.5px;}
+  header.app .sub{font-size:12px; color:var(--muted); margin-left:auto;}
+  .view{display:none; padding:14px 16px 24px;}
+  .view.active{display:block;}
+  body.tab-home{padding-bottom:calc(var(--tab-h) + var(--safe-b) + 84px);}
+
+  /* tabbar */
+  nav.tabbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    height:calc(var(--tab-h) + var(--safe-b)); padding-bottom:var(--safe-b);
+    background:var(--card); border-top:1px solid var(--line);
+    display:flex; max-width:640px; margin:0 auto;
+  }
+  nav.tabbar button{
+    flex:1; border:none; background:none; color:var(--muted);
+    font-size:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    cursor:pointer; font-family:inherit;
+  }
+  nav.tabbar button .ic{font-size:21px; line-height:1;}
+  nav.tabbar button.active{color:var(--accent); font-weight:700;}
+
+  /* decide bar */
+  .decide-bar{
+    display:none; position:fixed; left:0; right:0; bottom:calc(var(--tab-h) + var(--safe-b));
+    max-width:640px; margin:0 auto; z-index:25;
+    padding:10px 16px 12px; background:linear-gradient(to top, var(--bg) 70%, transparent);
+    align-items:center; gap:12px;
+  }
+  body.tab-home .decide-bar{display:flex;}
+  .count{font-size:14px; color:var(--muted); white-space:nowrap;}
+  .count b{color:var(--text); font-size:17px;}
+  .count.zero b{color:var(--exc);}
+  .decide{
+    flex:1; border:none; border-radius:16px; cursor:pointer; font-family:inherit;
+    background:var(--accent); color:#fff; font-size:21px; font-weight:800; padding:16px;
+    box-shadow:0 6px 18px rgba(255,107,53,.4); letter-spacing:1px;
+  }
+  .decide:active{transform:translateY(1px); background:var(--accent-d);}
+
+  /* hint + groups */
+  .hint{font-size:13px; color:var(--muted); background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:9px 12px; margin-bottom:14px;}
+  .hint .t-inc{color:var(--inc);} .hint .t-exc{color:var(--exc);}
+  .toprow{display:flex; align-items:center; margin-bottom:10px;}
+  .linkbtn{background:none; border:none; color:var(--accent); font-size:14px; cursor:pointer; font-family:inherit; padding:4px; font-weight:600;}
+  .fgroup{margin-bottom:14px;}
+  .fglabel{font-size:13px; font-weight:700; color:var(--muted); margin-bottom:7px;}
+  .fglabel .muted{font-weight:400;}
+  .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{
+    border:1.5px solid var(--chip-bd); background:var(--chip); color:var(--chip-tx);
+    border-radius:999px; padding:9px 14px; font-size:15px; cursor:pointer; font-family:inherit;
+    transition:transform .04s;
+  }
+  .chip:active{transform:scale(.96);}
+  .chip.inc{background:var(--inc-bg); border-color:var(--inc-bd); color:var(--inc); font-weight:700;}
+  .chip.exc{background:var(--exc-bg); border-color:var(--exc-bd); color:var(--exc); font-weight:700; text-decoration:line-through;}
+  .chip.sel{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700;}
+  .chip.add{border-style:dashed; color:var(--muted);}
+
+  .switchrow{display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:12px 14px; margin-top:6px;}
+  .switchrow span{flex:1; font-size:15px;}
+  input[type=checkbox]{width:22px; height:22px; accent-color:var(--accent); cursor:pointer;}
+
+  /* store list */
+  .listhead{display:flex; gap:10px; margin-bottom:12px;}
+  .search{flex:1; border:1px solid var(--line); background:var(--card); color:var(--text);
+    border-radius:12px; padding:11px 14px; font-size:15px; font-family:inherit;}
+  .btn{border:none; border-radius:12px; cursor:pointer; font-family:inherit; font-size:15px; font-weight:600; padding:11px 16px;}
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.ghost{background:var(--card); color:var(--text); border:1px solid var(--line);}
+  .btn.danger{background:var(--exc-bg); color:var(--exc); border:1px solid var(--exc-bd);}
+  .btn.block{display:block; width:100%; margin-top:10px; padding:14px;}
+  .btn:active{transform:translateY(1px);}
+
+  .scard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:13px 15px; margin-bottom:10px; cursor:pointer;}
+  .scard:active{background:var(--bg);}
+  .scard .nm{font-size:17px; font-weight:700; display:flex; align-items:center; gap:8px;}
+  .scard .meta{font-size:13px; color:var(--muted); margin-top:3px;}
+  .scard .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+  .tag{font-size:12px; background:var(--chip); border:1px solid var(--chip-bd); color:var(--chip-tx); border-radius:999px; padding:3px 9px;}
+  .empty{text-align:center; color:var(--muted); padding:40px 16px; font-size:15px; line-height:1.8;}
+  .empty .big{font-size:40px; display:block; margin-bottom:8px;}
+
+  /* settings */
+  .sect{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:6px 15px; margin-bottom:16px;}
+  .sect h2{font-size:14px; color:var(--muted); margin:14px 0 6px; font-weight:700;}
+  .row{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line);}
+  .row:last-child{border-bottom:none;}
+  .row .lbl{flex:1; font-size:15px;}
+  .row .lbl small{display:block; color:var(--muted); font-size:12px; font-weight:400;}
+  .stepper{display:flex; align-items:center; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden;}
+  .stepper button{width:38px; height:38px; border:none; background:var(--bg); color:var(--text); font-size:20px; cursor:pointer; font-family:inherit;}
+  .stepper b{min-width:34px; text-align:center; font-size:16px;}
+  .statline{display:flex; align-items:center; gap:8px; padding:8px 0; font-size:15px; border-bottom:1px dashed var(--line);}
+  .statline:last-child{border-bottom:none;}
+  .statline .rank{width:24px; color:var(--muted); font-weight:700;}
+  .statline .nm{flex:1;}
+  .statline .ct{color:var(--accent); font-weight:700;}
+  .statline .del{background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer;}
+  .ver{text-align:center; color:var(--muted); font-size:12px; margin-top:8px;}
+
+  /* modal */
+  .modal{position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.45); display:none; align-items:flex-end; justify-content:center;}
+  .modal.show{display:flex;}
+  @media(min-width:600px){ .modal{align-items:center;} }
+  .sheet{background:var(--card); width:100%; max-width:640px; max-height:92vh; overflow:auto;
+    border-radius:20px 20px 0 0; padding:18px 18px calc(20px + var(--safe-b)); box-shadow:var(--shadow);}
+  @media(min-width:600px){ .sheet{border-radius:20px; max-height:88vh;} }
+  .sheet h2.title{margin:2px 0 14px; font-size:18px;}
+  .field{margin-bottom:14px;}
+  .field label.flbl{display:block; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:6px;}
+  .field input.tin, .field textarea.tin{width:100%; border:1px solid var(--line); background:var(--bg); color:var(--text);
+    border-radius:12px; padding:12px 14px; font-size:16px; font-family:inherit;}
+  .field textarea.tin{min-height:70px; resize:vertical;}
+  .formbtns{display:flex; gap:10px; margin-top:6px;}
+  .formbtns .btn{flex:1; padding:14px;}
+
+  /* result */
+  .result-card{text-align:center; padding:8px 4px;}
+  .relaxnote{font-size:13px; color:var(--exc); background:var(--exc-bg); border:1px solid var(--exc-bd);
+    border-radius:10px; padding:8px 12px; margin-bottom:14px;}
+  .r-eyebrow{font-size:14px; color:var(--muted); margin-bottom:6px;}
+  #r-name{font-size:34px; font-weight:900; line-height:1.25; margin:6px 0 4px; word-break:break-word; color:var(--accent);}
+  #r-name.spin{opacity:.85; filter:blur(.3px);}
+  .r-info{margin:16px auto 4px; max-width:420px; text-align:left;}
+  .r-info .ri{display:flex; gap:10px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:15px;}
+  .r-info .ri:last-child{border-bottom:none;}
+  .r-info .ri .k{color:var(--muted); width:48px; flex-shrink:0;}
+  .r-info .tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;}
+  .toast{position:fixed; left:50%; bottom:calc(var(--tab-h) + 30px); transform:translateX(-50%);
+    background:#222; color:#fff; padding:11px 18px; border-radius:999px; font-size:14px; z-index:80;
+    opacity:0; transition:opacity .25s; pointer-events:none; max-width:90%;}
+  .toast.show{opacity:.95;}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body class="tab-home">
+
+<header class="app">
+  <h1>🍽️ 今天吃什麼？</h1>
+  <span class="sub">由 App 幫你決定</span>
+</header>
+
+<!-- 決定 -->
+<section id="view-home" class="view active">
+  <div class="hint">點一下＝<b class="t-inc">要</b>，再點一下＝<b class="t-exc">不要</b>，再點＝不限。沒選的就不限制。</div>
+  <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
+  <div id="filters"></div>
+  <label class="switchrow"><span>避開最近吃過的 🔁</span><input type="checkbox" id="avoidToggle"></label>
+</section>
+
+<!-- 決定列（固定底部） -->
+<div class="decide-bar">
+  <div id="count" class="count"></div>
+  <button id="decideBtn" class="decide">決定！</button>
+</div>
+
+<!-- 店家 -->
+<section id="view-stores" class="view">
+  <div class="listhead">
+    <input type="search" id="storeSearch" class="search" placeholder="搜尋店名或標籤…">
+    <button class="btn primary" id="addStoreBtn">＋ 新增</button>
+  </div>
+  <div id="storeList"></div>
+</section>
+
+<!-- 設定 -->
+<section id="view-settings" class="view">
+  <div id="settingsBody"></div>
+</section>
+
+<!-- 底部分頁 -->
+<nav class="tabbar">
+  <button data-tab="home" class="active"><span class="ic">🎯</span>決定</button>
+  <button data-tab="stores"><span class="ic">🏪</span>店家</button>
+  <button data-tab="settings"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<!-- 結果浮層 -->
+<div class="modal" id="resultModal">
+  <div class="sheet">
+    <div id="resultBody"></div>
+  </div>
+</div>
+
+<!-- 店家表單浮層 -->
+<div class="modal" id="formModal">
+  <div class="sheet">
+    <h2 class="title" id="formTitle">新增店家</h2>
+    <div class="field"><label class="flbl">店名（必填）</label><input class="tin" id="f-name" type="text" placeholder="例如：鼎泰豐"></div>
+    <div id="formGroups"></div>
+    <div class="field"><label class="flbl">地址／參考點（選填）</label><input class="tin" id="f-location" type="text" placeholder="例如：南屯老街 / 文心路 / 地址"></div>
+    <div class="field"><label class="flbl">備註</label><textarea class="tin" id="f-note" placeholder="推薦菜色、營業時間…"></textarea></div>
+    <div class="formbtns">
+      <button class="btn ghost" id="formCancel">取消</button>
+      <button class="btn primary" id="formSave">儲存</button>
+    </div>
+    <button class="btn danger block" id="formDelete" style="display:none">刪除這間店</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ---------- 資料層 ---------- */
+const KEY = "eat-what-data";
+const CATS = [
+  {key:"staple",  label:"主食", multi:true},
+  {key:"cuisine", label:"菜系", multi:false},
+  {key:"flavor",  label:"口味", multi:false},
+  {key:"meals",   label:"餐別", multi:true},
+  {key:"distance",label:"距離", multi:false},
+  {key:"price",   label:"價位", multi:false},
+  {key:"customTags", label:"自訂標籤", multi:true},
+];
+const CAT_LABEL = Object.fromEntries(CATS.map(c=>[c.key,c.label]));
+const DEFAULT_TAGS = {
+  staple:["麵","飯","麵包","火鍋","其他"],
+  cuisine:["台式","日式","韓式","中式","西式","美式","東南亞","其他"],
+  flavor:["清淡","適中","重口味"],
+  meals:["早餐","午餐","晚餐","宵夜"],
+  distance:["步行可到","車程5分鐘","車程10分鐘","車程15分鐘","車程20分鐘"],
+  price:["$","$$","$$$"],
+  customTags:[],
+};
+function defaults(){
+  return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true}};
+}
+function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
+function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+
+function normStore(s){
+  s = s || {};
+  return {
+    id: s.id || uid(),
+    name: String(s.name||"").trim(),
+    staple: Array.isArray(s.staple)? s.staple.slice() : (s.staple? [String(s.staple)] : []),
+    cuisine: s.cuisine||"", flavor: s.flavor||"",
+    meals: Array.isArray(s.meals)? s.meals.slice():[],
+    distance: s.distance||"",
+    price: s.price||"",
+    location: String(s.location||""), note: String(s.note||""),
+    customTags: Array.isArray(s.customTags)? s.customTags.slice():[],
+    createdAt: s.createdAt||Date.now(), updatedAt: s.updatedAt||Date.now(),
+  };
+}
+function normalize(d){
+  const out = defaults();
+  if(!d || typeof d!=="object") return out;
+  // tagOptions：保留使用者選項，並確保每個分類都存在
+  for(const k of Object.keys(DEFAULT_TAGS)){
+    const v = d.tagOptions && d.tagOptions[k];
+    out.tagOptions[k] = Array.isArray(v) ? Array.from(new Set(v.map(String))) : DEFAULT_TAGS[k].slice();
+  }
+  out.stores = Array.isArray(d.stores) ? d.stores.map(normStore) : [];
+  out.log = Array.isArray(d.log) ? d.log.filter(x=>x&&x.id).map(x=>({id:x.id, name:String(x.name||""), ts:x.ts||Date.now()})) : [];
+  out.settings = Object.assign(out.settings, d.settings||{});
+  out.settings.avoidRecent = !!out.settings.avoidRecent;
+  out.settings.animation = !!out.settings.animation;
+  out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
+  syncCustomTagOptions(out);
+  return out;
+}
+function syncCustomTagOptions(s){
+  s = s || state;
+  const set = new Set(s.tagOptions.customTags);
+  s.stores.forEach(st => (st.customTags||[]).forEach(t=>set.add(t)));
+  s.tagOptions.customTags = Array.from(set);
+}
+function load(){
+  try{ const raw = localStorage.getItem(KEY); return raw ? normalize(JSON.parse(raw)) : defaults(); }
+  catch(e){ console.warn(e); return defaults(); }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(e){ alert("儲存失敗：瀏覽器可能在無痕模式或限制了本機儲存。請改用一般視窗，或用「匯出 JSON」備份。"); }
+}
+let state = load();
+
+/* ---------- 小工具 ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+let toastTimer;
+function toast(msg){
+  const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"), 1800);
+}
+function reducedMotion(){ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } }
+function dateStr(){ const d=new Date(); const p=n=>String(n).padStart(2,"0"); return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate()); }
+
+/* ---------- 篩選狀態（僅此次使用，不寫入儲存） ---------- */
+let filters = {staple:{},cuisine:{},flavor:{},meals:{},distance:{},price:{},customTags:{}};
+function autoMeal(){
+  const h = new Date().getHours();
+  const m = (h>=5&&h<11)?"早餐":(h>=11&&h<17)?"午餐":(h>=17&&h<22)?"晚餐":"宵夜";
+  if(state.tagOptions.meals.includes(m)) filters.meals[m]=1;
+}
+function cycleFilter(cat, opt){
+  const cur = filters[cat][opt];
+  const next = cur===1 ? -1 : cur===-1 ? 0 : 1;
+  if(next===0) delete filters[cat][opt]; else filters[cat][opt]=next;
+}
+function clearFilters(){ filters={staple:{},cuisine:{},flavor:{},meals:{},distance:{},price:{},customTags:{}}; }
+function matchesFilters(store){
+  for(const cat of CATS){
+    const fmap = filters[cat.key]; const inc=[], exc=[];
+    for(const o in fmap){ if(fmap[o]===1) inc.push(o); else if(fmap[o]===-1) exc.push(o); }
+    if(!inc.length && !exc.length) continue;
+    const vals = cat.multi ? (store[cat.key]||[]) : (store[cat.key]? [store[cat.key]] : []);
+    if(inc.length && !vals.some(v=>inc.includes(v))) return false;
+    if(exc.length && vals.some(v=>exc.includes(v))) return false;
+  }
+  return true;
+}
+
+/* ---------- 分頁 ---------- */
+let currentTab = "home";
+function switchTab(tab){
+  currentTab = tab;
+  document.body.className = "tab-"+tab;
+  $$(".view").forEach(v=>v.classList.remove("active"));
+  $("#view-"+tab).classList.add("active");
+  $$("nav.tabbar button").forEach(b=>b.classList.toggle("active", b.dataset.tab===tab));
+  if(tab==="stores") renderStores();
+  if(tab==="settings") renderSettings();
+  if(tab==="home") renderHome();
+  window.scrollTo(0,0);
+}
+
+/* ---------- 主畫面：條件 ---------- */
+function renderFilters(){
+  let html="";
+  for(const cat of CATS){
+    const opts = state.tagOptions[cat.key]||[];
+    if(cat.key==="customTags" && opts.length===0) continue;
+    const chips = opts.map(o=>{
+      const st = filters[cat.key][o];
+      const cls = st===1?"chip inc":st===-1?"chip exc":"chip";
+      const mark = st===1?"✓ ":st===-1?"✕ ":"";
+      return `<button class="${cls}" data-cat="${cat.key}" data-opt="${esc(o)}">${mark}${esc(o)}</button>`;
+    }).join("");
+    html += `<div class="fgroup"><div class="fglabel">${cat.label}</div><div class="chips">${chips}</div></div>`;
+  }
+  $("#filters").innerHTML = html;
+}
+function updateCount(){
+  const n = state.stores.filter(matchesFilters).length;
+  const el = $("#count");
+  el.innerHTML = `目前符合 <b>${n}</b> 間`;
+  el.classList.toggle("zero", n===0 && state.stores.length>0);
+}
+function renderHome(){
+  renderFilters();
+  $("#avoidToggle").checked = state.settings.avoidRecent;
+  updateCount();
+}
+
+/* ---------- 隨機抽選 ---------- */
+let currentList=[], currentRelaxed=false, currentPick=null;
+function applyAvoid(cands){
+  if(!state.settings.avoidRecent) return {list:cands, relaxed:false};
+  const recent = state.log.slice(0, state.settings.avoidWindow).map(x=>x.id);
+  const filtered = cands.filter(s=>!recent.includes(s.id));
+  if(filtered.length===0) return {list:cands, relaxed:true};
+  return {list:filtered, relaxed:false};
+}
+function pickFrom(list, avoidId){
+  let pool = list;
+  if(list.length>1 && avoidId) pool = list.filter(s=>s.id!==avoidId);
+  if(pool.length===0) pool = list;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function decide(){
+  if(state.stores.length===0){ openResultEmpty("noStore"); return; }
+  const cands = state.stores.filter(matchesFilters);
+  if(cands.length===0){ openResultEmpty("noMatch"); return; }
+  const {list, relaxed} = applyAvoid(cands);
+  openResult(list, relaxed, null);
+}
+function openResult(list, relaxed, avoidId){
+  currentList=list; currentRelaxed=relaxed;
+  const pick = pickFrom(list, avoidId);
+  currentPick = pick;
+  const animate = state.settings.animation && !reducedMotion() && list.length>1;
+  $("#resultBody").innerHTML = `
+    ${relaxed?'<div class="relaxnote">符合的店最近都吃過了，已暫時不避開最近紀錄 🙂</div>':''}
+    <div class="result-card">
+      <div class="r-eyebrow">今天就吃…</div>
+      <div id="r-name"${animate?' class="spin"':''}>${esc(pick.name)}</div>
+      <div class="r-info" id="r-info"></div>
+    </div>
+    <div class="formbtns" style="margin-top:18px">
+      <button class="btn ghost" id="rerollBtn">🔁 再抽一次</button>
+      <button class="btn primary" id="acceptBtn">就吃這間！</button>
+    </div>
+    <button class="linkbtn" id="resultClose" style="display:block;margin:12px auto 0">關閉</button>`;
+  $("#rerollBtn").onclick = ()=> openResult(currentList, currentRelaxed, currentPick&&currentPick.id);
+  $("#acceptBtn").onclick = acceptPick;
+  $("#resultClose").onclick = closeResult;
+  showModal("#resultModal");
+  if(animate){
+    setButtonsDisabled(true);
+    runSlot(list.map(s=>s.name), pick.name, ()=>{
+      $("#r-name").classList.remove("spin");
+      renderResultInfo(pick); setButtonsDisabled(false);
+    });
+  } else {
+    renderResultInfo(pick);
+  }
+}
+function setButtonsDisabled(d){ ["#rerollBtn","#acceptBtn"].forEach(s=>{const b=$(s); if(b) b.disabled=d;}); }
+function runSlot(names, finalName, done){
+  const el = $("#r-name");
+  let delay=45, elapsed=0; const total=850;
+  (function tick(){
+    el.textContent = names[Math.floor(Math.random()*names.length)] || finalName;
+    elapsed += delay;
+    if(elapsed < total){ delay *= 1.14; setTimeout(tick, delay); }
+    else { el.textContent = finalName; done && done(); }
+  })();
+}
+function renderResultInfo(s){
+  const rows=[];
+  const add=(k,v)=>{ if(v) rows.push(`<div class="ri"><span class="k">${k}</span><span>${esc(v)}</span></div>`); };
+  add("主食", (s.staple||[]).join("、")); add("菜系", s.cuisine); add("口味", s.flavor);
+  add("餐別", (s.meals||[]).join("、")); add("距離", s.distance); add("價位", s.price);
+  add("地點", s.location); add("備註", s.note);
+  if(s.customTags && s.customTags.length){
+    rows.push(`<div class="ri"><span class="k">標籤</span><span class="tags">${s.customTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</span></div>`);
+  }
+  $("#r-info").innerHTML = rows.join("") || '<div class="ri"><span class="k">　</span><span class="k">（沒有其他資訊）</span></div>';
+}
+function acceptPick(){
+  if(!currentPick) return;
+  state.log.unshift({id:currentPick.id, name:currentPick.name, ts:Date.now()});
+  if(state.log.length>365) state.log.length=365;
+  save();
+  const nm = currentPick.name;
+  closeResult();
+  toast("好的，就吃「"+nm+"」🍽️");
+}
+function openResultEmpty(kind){
+  const msg = kind==="noStore"
+    ? {icon:"🏪", title:"還沒有任何店家", desc:"先到「店家」新增，或到「設定」帶入在地起始店家。", btn:"前往新增", act:()=>{closeResult(); switchTab("stores");}}
+    : {icon:"🤔", title:"沒有符合條件的店", desc:"要不要放寬一下條件？", btn:"清除全部條件", act:()=>{clearFilters(); renderHome(); closeResult(); toast("已清除條件");}};
+  $("#resultBody").innerHTML = `
+    <div class="empty"><span class="big">${msg.icon}</span><b>${msg.title}</b><br>${msg.desc}</div>
+    <div class="formbtns"><button class="btn ghost" id="resultClose">關閉</button><button class="btn primary" id="emptyAct">${msg.btn}</button></div>`;
+  $("#resultClose").onclick = closeResult;
+  $("#emptyAct").onclick = msg.act;
+  showModal("#resultModal");
+}
+function closeResult(){ hideModal("#resultModal"); }
+
+/* ---------- 店家清單 ---------- */
+function storeMetaLine(s){
+  return [s.cuisine, (s.staple||[]).join("/"), s.flavor, s.price].filter(Boolean).join(" · ");
+}
+function renderStores(){
+  const q = ($("#storeSearch").value||"").trim().toLowerCase();
+  let list = state.stores.slice().sort((a,b)=>a.name.localeCompare(b.name,"zh-Hant"));
+  if(q) list = list.filter(s=> (s.name+" "+(s.customTags||[]).join(" ")+" "+s.cuisine+" "+(s.staple||[]).join(" ")+" "+s.distance).toLowerCase().includes(q));
+  const wrap = $("#storeList");
+  if(state.stores.length===0){
+    wrap.innerHTML = `<div class="empty"><span class="big">🏪</span>還沒有店家<br>點右上角「＋ 新增」，<br>或到「設定」帶入在地起始店家。</div>`;
+    return;
+  }
+  if(list.length===0){ wrap.innerHTML = `<div class="empty">找不到符合「${esc(q)}」的店家</div>`; return; }
+  wrap.innerHTML = list.map(s=>{
+    const meals = (s.meals||[]).length ? `<span class="tag">${s.meals.join("/")}</span>` : "";
+    const ctags = (s.customTags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+    return `<div class="scard" data-id="${s.id}">
+      <div class="nm">${esc(s.name)}</div>
+      <div class="meta">${esc(storeMetaLine(s))}${s.distance? " · "+esc(s.distance):""}</div>
+      ${(meals||ctags)?`<div class="tags">${meals}${ctags}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+/* ---------- 店家表單 ---------- */
+let formStore=null, editingId=null;
+function blankStore(){ return {id:"",name:"",staple:[],cuisine:"",flavor:"",meals:[],distance:"",price:"",location:"",note:"",customTags:[]}; }
+function openForm(store){
+  editingId = store ? store.id : null;
+  formStore = store ? JSON.parse(JSON.stringify(store)) : blankStore();
+  $("#formTitle").textContent = store ? "編輯店家" : "新增店家";
+  $("#f-name").value = formStore.name;
+  $("#f-location").value = formStore.location;
+  $("#f-note").value = formStore.note;
+  $("#formDelete").style.display = store ? "block" : "none";
+  renderFormGroups();
+  showModal("#formModal");
+}
+function renderFormGroups(){
+  $("#formGroups").innerHTML = CATS.map(cat=>{
+    const opts = state.tagOptions[cat.key]||[];
+    const chips = opts.map(o=>{
+      const active = cat.multi ? formStore[cat.key].includes(o) : formStore[cat.key]===o;
+      return `<button type="button" class="chip ${active?"sel":""}" data-fcat="${cat.key}" data-opt="${esc(o)}">${esc(o)}</button>`;
+    }).join("");
+    const sub = cat.multi ? '<span class="muted">（可多選）</span>' : "";
+    return `<div class="field"><label class="flbl">${cat.label} ${sub}</label>
+      <div class="chips">${chips}<button type="button" class="chip add" data-add="${cat.key}">＋ 新增</button></div></div>`;
+  }).join("");
+}
+function addOption(catKey){
+  const v = (prompt("新增「"+CAT_LABEL[catKey]+"」選項：")||"").trim();
+  if(!v) return;
+  if(!state.tagOptions[catKey].includes(v)) state.tagOptions[catKey].push(v);
+  save();
+  renderFormGroups();
+}
+function saveForm(){
+  formStore.name = ($("#f-name").value||"").trim();
+  formStore.location = $("#f-location").value||"";
+  formStore.note = $("#f-note").value||"";
+  if(!formStore.name){ alert("請輸入店名"); $("#f-name").focus(); return; }
+  formStore.updatedAt = Date.now();
+  if(editingId){
+    const i = state.stores.findIndex(s=>s.id===editingId);
+    if(i>=0) state.stores[i] = formStore;
+  } else {
+    formStore.id = uid(); formStore.createdAt = Date.now();
+    state.stores.push(formStore);
+  }
+  syncCustomTagOptions();
+  save();
+  hideModal("#formModal");
+  renderStores();
+  toast("已儲存");
+}
+function deleteStore(){
+  if(!editingId) return;
+  if(!confirm("確定刪除「"+formStore.name+"」？")) return;
+  state.stores = state.stores.filter(s=>s.id!==editingId);
+  save();
+  hideModal("#formModal");
+  renderStores();
+  toast("已刪除");
+}
+
+/* ---------- 設定 ---------- */
+function renderSettings(){
+  const st = state.settings;
+  const counts={};
+  state.log.forEach(e=>counts[e.id]=(counts[e.id]||0)+1);
+  const top = Object.entries(counts).map(([id,c])=>{
+    const s = state.stores.find(x=>x.id===id); const lg = state.log.find(x=>x.id===id);
+    return {id, c, name:(s&&s.name)||(lg&&lg.name)||"（已刪除）"};
+  }).sort((a,b)=>b.c-a.c).slice(0,8);
+  const recent = state.log.slice(0,12);
+
+  $("#settingsBody").innerHTML = `
+    <div class="sect">
+      <h2>抽選規則</h2>
+      <div class="row"><div class="lbl">避開最近吃過的<small>抽選時自動跳過最近吃過的店</small></div><input type="checkbox" id="set-avoid" ${st.avoidRecent?"checked":""}></div>
+      <div class="row"><div class="lbl">避開最近幾次<small>記住最近 N 次當作「最近吃過」</small></div>
+        <div class="stepper"><button id="aw-minus">−</button><b id="aw-val">${st.avoidWindow}</b><button id="aw-plus">＋</button></div></div>
+      <div class="row"><div class="lbl">抽選動畫<small>按「決定！」時的老虎機效果</small></div><input type="checkbox" id="set-anim" ${st.animation?"checked":""}></div>
+    </div>
+
+    <div class="sect">
+      <h2>資料備份</h2>
+      <div class="row"><div class="lbl">匯出 JSON<small>下載一份備份檔</small></div><button class="btn ghost" id="btn-export">匯出</button></div>
+      <div class="row"><div class="lbl">匯入 JSON<small>從備份檔還原（會覆蓋現有資料）</small></div><button class="btn ghost" id="btn-import">匯入</button></div>
+      <div class="row"><div class="lbl">重新帶入在地起始店家<small>嶺東／南屯一帶人氣店家</small></div><button class="btn ghost" id="btn-sample">帶入</button></div>
+      <div class="row"><div class="lbl" style="color:var(--exc)">清除所有資料<small>店家、設定、紀錄全部清空</small></div><button class="btn danger" id="btn-clear">清除</button></div>
+    </div>
+
+    <div class="sect">
+      <h2>統計 · 最常被抽到</h2>
+      ${top.length? top.map((t,i)=>`<div class="statline"><span class="rank">${i+1}</span><span class="nm">${esc(t.name)}</span><span class="ct">${t.c} 次</span></div>`).join("")
+        : '<div class="empty" style="padding:18px">還沒有「就吃這間」的紀錄</div>'}
+    </div>
+
+    <div class="sect">
+      <h2>最近吃過</h2>
+      ${recent.length? recent.map((e,i)=>`<div class="statline"><span class="nm">${esc(e.name)}</span><span class="ct" style="color:var(--muted);font-weight:400">${fmtDate(e.ts)}</span><button class="del" data-logi="${i}" title="刪除這筆">✕</button></div>`).join("")
+        : '<div class="empty" style="padding:18px">還沒有紀錄</div>'}
+    </div>
+    <div class="ver">今天吃什麼？ · 共 ${state.stores.length} 間店家 · 資料存在本機瀏覽器</div>`;
+
+  $("#set-avoid").onchange = e=>{ state.settings.avoidRecent=e.target.checked; save(); };
+  $("#set-anim").onchange  = e=>{ state.settings.animation=e.target.checked; save(); };
+  $("#aw-minus").onclick = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow-1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
+  $("#aw-plus").onclick  = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow+1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
+  $("#btn-export").onclick = exportData;
+  $("#btn-import").onclick = ()=> $("#importFile").click();
+  $("#btn-sample").onclick = loadSamples;
+  $("#btn-clear").onclick  = clearAll;
+  $$("#settingsBody .del").forEach(b=> b.onclick=()=>{ state.log.splice(parseInt(b.dataset.logi),1); save(); renderSettings(); });
+}
+function fmtDate(ts){ const d=new Date(ts); const p=n=>String(n).padStart(2,"0"); return (d.getMonth()+1)+"/"+d.getDate()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+
+/* ---------- 匯出 / 匯入 / 清除 / 範例 ---------- */
+function exportData(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download="今天吃什麼-備份-"+dateStr()+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast("已匯出備份");
+}
+function importData(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data || !Array.isArray(data.stores)) throw new Error("格式不符");
+      if(!confirm("匯入會「覆蓋」目前所有資料，確定嗎？")) return;
+      state = normalize(data); save();
+      clearFilters(); autoMeal();
+      renderHome(); renderStores(); renderSettings();
+      toast("已匯入 "+state.stores.length+" 間店家");
+    }catch(e){ alert("匯入失敗：這個檔案看起來不是有效的備份 JSON。"); }
+  };
+  reader.readAsText(file);
+}
+function clearAll(){
+  if(!confirm("確定要清除所有資料？此動作無法復原（建議先匯出備份）。")) return;
+  state = defaults(); save();
+  clearFilters(); autoMeal();
+  renderHome(); renderStores(); renderSettings();
+  toast("已清除所有資料");
+}
+// 嶺東／南屯一帶人氣店家作為起始資料（評價、車程為概估，請依實際情況自行調整）
+const SAMPLE = [
+  {name:"鈞泓家 嶺東店",          staple:["飯","麵包","其他"], cuisine:"台式", flavor:"適中", meals:["早餐","午餐","晚餐","宵夜"], distance:"步行可到", price:"$",   location:"嶺東科大旁", note:"早餐賣到宵夜，學生大推", customTags:["學生愛"]},
+  {name:"朝司暮想",               staple:["麵包"],            cuisine:"台式", flavor:"適中", meals:["早餐","午餐"],            distance:"車程5分鐘",  price:"$",   location:"南屯", note:"銅板價肉蛋吐司，可外送", customTags:["學生愛"]},
+  {name:"成功臭豆腐",             staple:["其他"],            cuisine:"台式", flavor:"重口味", meals:["午餐","晚餐","宵夜"],     distance:"車程5分鐘",  price:"$",   location:"嶺東周邊", note:"酥脆臭豆腐"},
+  {name:"蒸心手工小籠湯包",       staple:["麵","其他"],        cuisine:"中式", flavor:"適中", meals:["早餐","午餐"],            distance:"車程5分鐘",  price:"$",   location:"嶺東周邊", note:"現包小籠湯包"},
+  {name:"饗食拉麵",               staple:["麵"],              cuisine:"日式", flavor:"重口味", meals:["午餐","晚餐"],            distance:"車程5分鐘",  price:"$$",  location:"南屯區忠勇路", note:"牛腩拉麵、麻辣乳酪拉麵", customTags:["學生愛"]},
+  {name:"台客燒肉粥",             staple:["飯","其他"],        cuisine:"台式", flavor:"適中", meals:["早餐","午餐","晚餐"],     distance:"車程10分鐘", price:"$",   location:"捷運南屯站附近", note:"米其林必比登，燒肉粥", customTags:["必比登"]},
+  {name:"南屯蕭爌肉飯",           staple:["飯"],              cuisine:"台式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程10分鐘", price:"$",   location:"南屯市場內", note:"半肥瘦爌肉飯"},
+  {name:"廖記麵線（老街麵線）",   staple:["麵","飯"],          cuisine:"台式", flavor:"適中", meals:["早餐","午餐"],            distance:"車程10分鐘", price:"$",   location:"南屯老街", note:"滷肉飯、陽春麵、朴菜飯"},
+  {name:"田寮農莊",               staple:["飯"],              cuisine:"台式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程10分鐘", price:"$$",  location:"南屯區樂田巷", note:"台式合菜，約 4.6★，低消 $200", customTags:["聚餐"]},
+  {name:"養鍋 石頭涮涮鍋（南屯黎明店）", staple:["火鍋"],      cuisine:"台式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程10分鐘", price:"$$",  location:"南屯區黎明路", note:"蔬菜自助吧吃到飽"},
+  {name:"銀鉤韓式銅盤烤肉涮涮鍋", staple:["火鍋","其他"],      cuisine:"韓式", flavor:"重口味", meals:["午餐","晚餐"],            distance:"車程15分鐘", price:"$$",  location:"大墩商圈", note:"韓式銅盤烤肉、涮涮鍋", customTags:["聚餐","吃到飽"]},
+  {name:"和道屋 居酒屋",          staple:["其他"],            cuisine:"日式", flavor:"重口味", meals:["晚餐","宵夜"],            distance:"車程15分鐘", price:"$$",  location:"公益路二段", note:"20 年老字號居酒屋，營業到凌晨", customTags:["聚餐"]},
+  {name:"雪莉牛排海鮮餐廳",       staple:["飯","其他"],        cuisine:"西式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程15分鐘", price:"$$$", location:"西區存中街", note:"約 4.5★，牛排海鮮，週一公休", customTags:["聚餐"]},
+  {name:"Mr.38 咖哩",            staple:["飯"],              cuisine:"日式", flavor:"適中", meals:["午餐","晚餐"],            distance:"車程15分鐘", price:"$",   location:"台中老牌咖哩", note:"大份量、免費續飯續湯", customTags:["學生愛"]},
+];
+function loadSamples(){
+  if(state.stores.length>0 && !confirm("會在現有店家後面加入 "+SAMPLE.length+" 間在地起始店家，確定嗎？")) return;
+  SAMPLE.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
+  syncCustomTagOptions(); save();
+  renderStores();
+  toast("已加入 "+SAMPLE.length+" 間在地起始店家");
+  switchTab("stores");
+}
+
+/* ---------- Modal 控制 ---------- */
+function showModal(sel){ $(sel).classList.add("show"); }
+function hideModal(sel){ $(sel).classList.remove("show"); }
+
+/* ---------- 事件綁定 ---------- */
+$$("nav.tabbar button").forEach(b=> b.onclick=()=>switchTab(b.dataset.tab));
+$("#decideBtn").onclick = decide;
+$("#clearFilters").onclick = ()=>{ clearFilters(); renderHome(); };
+$("#avoidToggle").onchange = e=>{ state.settings.avoidRecent=e.target.checked; save(); };
+$("#filters").addEventListener("click", e=>{
+  const b = e.target.closest(".chip"); if(!b) return;
+  cycleFilter(b.dataset.cat, b.dataset.opt);
+  renderFilters(); updateCount();
+});
+$("#addStoreBtn").onclick = ()=> openForm(null);
+$("#storeSearch").addEventListener("input", renderStores);
+$("#storeList").addEventListener("click", e=>{
+  const card = e.target.closest(".scard"); if(!card) return;
+  const s = state.stores.find(x=>x.id===card.dataset.id); if(s) openForm(s);
+});
+$("#formGroups").addEventListener("click", e=>{
+  const add = e.target.closest("[data-add]");
+  if(add){ addOption(add.dataset.add); return; }
+  const chip = e.target.closest("[data-fcat]");
+  if(!chip) return;
+  const cat = chip.dataset.fcat, opt = chip.dataset.opt;
+  const meta = CATS.find(c=>c.key===cat);
+  if(meta.multi){
+    const arr = formStore[cat];
+    const i = arr.indexOf(opt);
+    if(i>=0) arr.splice(i,1); else arr.push(opt);
+  } else {
+    formStore[cat] = (formStore[cat]===opt) ? "" : opt;
+  }
+  renderFormGroups();
+});
+$("#f-name").addEventListener("input", e=>{ if(formStore) formStore.name=e.target.value; });
+$("#formSave").onclick = saveForm;
+$("#formCancel").onclick = ()=> hideModal("#formModal");
+$("#formDelete").onclick = deleteStore;
+// 點背景關閉浮層
+$("#resultModal").addEventListener("click", e=>{ if(e.target.id==="resultModal") closeResult(); });
+$("#formModal").addEventListener("click", e=>{ if(e.target.id==="formModal") hideModal("#formModal"); });
+
+// 隱藏的匯入檔案輸入
+const importInput = document.createElement("input");
+importInput.type="file"; importInput.accept="application/json,.json"; importInput.id="importFile"; importInput.style.display="none";
+importInput.addEventListener("change", e=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=""; });
+document.body.appendChild(importInput);
+
+/* ---------- 啟動 ---------- */
+// 首次開啟自動帶入在地起始店家（嶺東／南屯）；清空資料後就不會再自動帶入
+if(localStorage.getItem(KEY)===null){
+  SAMPLE.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
+  syncCustomTagOptions(); save();
+}
+autoMeal();
+renderHome();
+renderStores();
+renderSettings();
+</script>
+</body>
+</html>
