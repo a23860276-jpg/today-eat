@@ -41,8 +41,7 @@ python3 -m http.server 8000
 ## 使用流程
 
 ### 1. 建立店家（「店家」分頁）
-- 右上「＋ 新增」，**店名欄打字會即時跳出真實店家清單**（連鎖店尤其準），點一下就帶入正確店名與座標——有了座標，距離就能自動算（見下）。查不到也沒關係，直接打字一樣可用。
-- 其餘屬性用**點選標籤**設定：
+- 右上「＋ 新增」，填**店名（必填）**，其餘屬性用**點選標籤**設定：
   - **主食**（可多選）：麵、飯、鍋物、麵食、其他
   - **菜系**（可多選）：中式、西式、日式、東南亞、韓式、其他
   - **餐別**（可多選）：早餐、午餐、晚餐、宵夜
@@ -106,8 +105,7 @@ python3 -m http.server 8000
 ---
 
 ## 其他功能
-- **地點自動完成**：新增店家時打字即時搜尋真實店家（資料來源 OpenStreetMap），點選自動帶入店名與座標。需連網；連鎖店命中率高，巷弄小店可能查不到（直接打字即可）。
-- **一鍵自動算距離**：「設定 →距離設定」可設定「家的位置」，再按「一鍵自動算距離」，就會幫**還沒填距離**的店家自動推算（用座標 → 直線距離 → 車程級距）；查不到座標的店會列出來、略過，請手動設定。**不會覆蓋**已填好的距離。
+- **一鍵自動算距離**（需自備 Google API 金鑰）：「設定 →距離設定」填入金鑰、設好「家的位置」，按「開始」，就會用 Google 幫**還沒填距離**的店家推算距離。**只會存「車程X分鐘內」級距、不保留座標**；查不到的店會列出並略過；**不會覆蓋**已填好的距離。金鑰只存在你的瀏覽器、不會上傳。設定方式見下方。
   - 目前是**直線距離估算**；之後會升級成 OSRM／OpenRouteService 的**實際車程**（程式已預留切換點）。
 - **兩人否決權**：可在「設定 →否決權成員」改兩個人的名字，讓這個 App 也能給別人用。
 - **Google 地圖導航**：選定店家後自動開啟 Google 地圖、直接帶到導航；可在「設定 →選定後開啟 Google 地圖」關閉。
@@ -119,7 +117,17 @@ python3 -m http.server 8000
 ## 技術說明（給之後想維護的人）
 - 單檔 `index.html`，內含 HTML / CSS / vanilla JavaScript，無任何相依套件或 CDN。
 - 所有資料存在 `localStorage` 的 `eat-what-data` 這個 key，結構為單一 JSON 物件：
-  `{ version, stores[], tagOptions, log[], settings }`。每間店家含 `lat/lng`（由自動完成或自動算距離時填入）；`settings.home` 是距離基準點。
-- **距離估算**：在 `estimateDriveMinutes(home, s)` 一個函式裡。目前回傳「直線公里 × `MIN_PER_KM`」。要換成真實車程時，把這個函式改成 `await` 呼叫 **OSRM**（`router.project-osrm.org/route/v1/driving/...`，回傳 `duration/60`）或 OpenRouteService 即可，其他程式（級距對應、自動補距離流程）都不用動——檔案裡已有註解範例。
-- 地點搜尋用 **Photon（OpenStreetMap）** 公開 API；上架/量大時建議自架 Photon 或改用有金鑰的可儲存來源（Geoapify/Foursquare）。
+  `{ version, stores[], tagOptions, log[], settings }`。店家**不存座標**（算距離時即時取得、用完即丟，只留級距）；`settings.home` 是距離基準點、`settings.googleKey` 是金鑰（都只在本機，不進 repo）。
+- **距離估算**：座標來自 `googleGeocode()`（Google Places API New 的 `searchText`，前端直接 fetch、支援 CORS）。距離換算集中在 `estimateDriveMinutes(home, s)`：目前回傳「直線公里 × `MIN_PER_KM`」，要換**實際車程**只改這個函式（改成 `await` 呼叫 OSRM `router.project-osrm.org/route/v1/driving/...` 取 `duration/60`，或 OpenRouteService），其他都不用動——檔案裡有註解範例。
 - 之後想加新功能，資料結構已預留空間，直接擴充即可。
+
+---
+
+## 取得 Google API 金鑰（只有「自動算距離」需要）
+個人用量通常在免費額度內，但 Google 要求綁一張信用卡。
+1. 到 [Google Cloud Console](https://console.cloud.google.com/) 建立一個專案。
+2. 「API 和服務 →啟用 API」啟用 **Places API (New)**。
+3. 「帳單 Billing」開通計費。
+4. 「憑證 →建立憑證 →API 金鑰」，複製金鑰。
+5. （建議）編輯金鑰：應用程式限制選「**網站**」，加入你的網址（例：`https://a23860276-jpg.github.io/*`）；API 限制只勾「Places API (New)」。
+6. 把金鑰貼到 App「**設定 →距離設定 →Google API 金鑰**」按儲存。

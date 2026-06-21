@@ -227,16 +227,6 @@
   .confetti-root{position:fixed; inset:0; pointer-events:none; z-index:200; overflow:hidden;}
   .confetti-pc{position:absolute; top:32%; width:9px; height:14px; border-radius:2px; will-change:transform,opacity;}
 
-  /* 地點自動完成 */
-  .ac-wrap{position:relative;}
-  .ac-list{position:absolute; left:0; right:0; top:calc(100% + 5px); z-index:6; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--sh-lg); overflow:hidden; max-height:270px; overflow-y:auto; display:none;}
-  .ac-list.show{display:block;}
-  .ac-item{padding:11px 14px; cursor:pointer; border-bottom:1px solid var(--line);}
-  .ac-item:active{background:var(--bg);}
-  .ac-item .nm{font-weight:700; font-size:15px;}
-  .ac-item .ad{font-size:12px; color:var(--muted); margin-top:2px;}
-  .ac-foot{padding:7px 14px; font-size:11px; color:var(--muted); background:var(--bg);}
-  .ac-hint{font-size:12px; color:var(--muted); margin-top:7px; min-height:14px;}
   @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
 
 </style>
@@ -295,13 +285,7 @@
 <div class="modal" id="formModal">
   <div class="sheet">
     <h2 class="title" id="formTitle">新增店家</h2>
-    <div class="field"><label class="flbl">店名（必填）</label>
-      <div class="ac-wrap">
-        <input class="tin" id="f-name" type="text" placeholder="打字搜尋真實店家，或直接輸入" autocomplete="off">
-        <div id="nameAC" class="ac-list"></div>
-      </div>
-      <div class="ac-hint" id="acHint"></div>
-    </div>
+    <div class="field"><label class="flbl">店名（必填）</label><input class="tin" id="f-name" type="text" placeholder="例如：鼎泰豐"></div>
     <div id="formGroups"></div>
     <div class="field"><label class="flbl">地址／參考點（選填）</label><input class="tin" id="f-location" type="text" placeholder="例如：南屯老街 / 文心路 / 地址"></div>
     <div class="field"><label class="flbl">備註</label><textarea class="tin" id="f-note" placeholder="推薦菜色、營業時間…"></textarea></div>
@@ -339,7 +323,7 @@ const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"太太", home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"太太", googleKey:"", home:Object.assign({},DEFAULT_HOME)}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -366,7 +350,6 @@ function normStore(s){
     location: String(pick("location","地址","地點")||""),
     note: String(pick("note","備註")||""),
     votes: Array.isArray(s.votes)? [s.votes[0]||"", s.votes[1]||""] : ["",""],
-    lat: numOrNull(pick("lat","緯度")), lng: numOrNull(pick("lng","經度")),
     createdAt: s.createdAt||Date.now(), updatedAt: s.updatedAt||Date.now(),
   };
 }
@@ -388,6 +371,7 @@ function normalize(d){
   out.settings.user1 = String(out.settings.user1||"").trim().slice(0,12) || "我";
   out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "太太";
   var _h = d.settings && d.settings.home; out.settings.home = (_h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||DEFAULT_HOME.label), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng)} : Object.assign({},DEFAULT_HOME);
+  out.settings.googleKey = String(out.settings.googleKey||"");
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
 }
@@ -692,17 +676,15 @@ function renderStores(){
 
 /* ---------- 店家表單 ---------- */
 let formStore=null, editingId=null;
-function blankStore(){ return {id:"",name:"",staple:[],cuisine:[],meals:[],distance:"",price:"",location:"",note:"",votes:["",""],lat:null,lng:null}; }
+function blankStore(){ return {id:"",name:"",staple:[],cuisine:[],meals:[],distance:"",price:"",location:"",note:"",votes:["",""]}; }
 function openForm(store){
   editingId = store ? store.id : null;
   formStore = store ? JSON.parse(JSON.stringify(store)) : blankStore();
-  if(formStore.lat===undefined){ formStore.lat=null; formStore.lng=null; }
   $("#formTitle").textContent = store ? "編輯店家" : "新增店家";
   $("#f-name").value = formStore.name;
   $("#f-location").value = formStore.location;
   $("#f-note").value = formStore.note;
   $("#formDelete").style.display = store ? "block" : "none";
-  hideAC(); var _ah=$("#acHint"); if(_ah) _ah.textContent="";
   renderFormGroups();
   showModal("#formModal");
 }
@@ -768,11 +750,13 @@ function renderSettings(){
     </div>
 
     <div class="sect">
-      <h2>距離設定（OpenStreetMap）</h2>
-      <div class="row"><div class="lbl">家的位置<small>用來推算各店距離｜目前：${esc((st.home&&st.home.label)||"未設定")}</small></div></div>
-      <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="輸入住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
-      <div class="row"><div class="lbl">一鍵自動算距離<small>幫「還沒填距離」的店家自動推算；查不到會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
-      <div class="ver" style="text-align:left;margin:6px 2px 2px">地點資料 © OpenStreetMap 貢獻者</div>
+      <h2>距離設定（Google）</h2>
+      <div class="row"><div class="lbl">Google API 金鑰<small>自動算距離用；金鑰只存在你的瀏覽器、不會上傳</small></div></div>
+      <div class="row" style="gap:8px"><input class="nameinput" id="set-gkey" type="password" style="flex:1; width:auto" placeholder="貼上 Google API 金鑰" value="${esc(st.googleKey||"")}"><button class="btn ghost" id="btn-gkey" style="flex:0 0 auto">儲存</button></div>
+      <div class="row"><div class="lbl">家的位置<small>距離的基準點｜目前：${esc((st.home&&st.home.label)||"未設定")}</small></div></div>
+      <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
+      <div class="row"><div class="lbl">一鍵自動算距離<small>用 Google 幫「還沒填距離」的店推算；只存級距、不存座標；查不到會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
+      <div class="ver" style="text-align:left;margin:6px 2px 2px">建議在 Google Cloud 限制此金鑰只用於「Places API (New)」與你的網站網址。</div>
     </div>
 
     <div class="sect">
@@ -809,6 +793,7 @@ function renderSettings(){
   $("#set-maps").onchange  = e=>{ state.settings.openMaps=e.target.checked; save(); };
   $("#set-user1").onchange = e=>{ state.settings.user1=(e.target.value||"").trim().slice(0,8)||"我"; e.target.value=state.settings.user1; save(); };
   $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"太太"; e.target.value=state.settings.user2; save(); };
+  if($("#btn-gkey")) $("#btn-gkey").onclick = ()=>{ state.settings.googleKey=($("#set-gkey").value||"").trim(); save(); toast(state.settings.googleKey?"已儲存金鑰":"已清除金鑰"); };
   if($("#btn-homeset")) $("#btn-homeset").onclick = setHomeFromInput;
   if($("#btn-autodist")) $("#btn-autodist").onclick = autoFillDistances;
   $("#aw-minus").onclick = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow-1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
@@ -935,23 +920,25 @@ function loadSamples(){
   switchTab("stores");
 }
 
-/* ---------- 地點 / 距離（OpenStreetMap · Photon；之後可換 OSRM 精確版） ---------- */
-const PHOTON = "https://photon.komoot.io/api/";
-function searchBias(){ const h=state.settings.home; return (h&&h.lat!=null)?{lat:h.lat,lng:h.lng}:{lat:24.146,lng:120.63}; }
-async function photonSearch(q, bias, limit){
-  const u = new URL(PHOTON);
-  u.searchParams.set("q", q);
-  u.searchParams.set("limit", String(limit||6));
-  if(bias && bias.lat!=null){ u.searchParams.set("lat", bias.lat); u.searchParams.set("lon", bias.lng); }
-  const r = await fetch(u.toString());
-  if(!r.ok) throw new Error("photon "+r.status);
+/* ---------- 距離（Google Places API New 取座標 → 只存級距、不存座標；之後可換 OSRM 精確版） ---------- */
+const GPLACES = "https://places.googleapis.com/v1/places:searchText";
+// 用 Google 把「店名/地址」轉成座標（暫時用、用完即丟）。需使用者自備 Google API 金鑰。
+async function googleGeocode(query, bias){
+  const key = (state.settings.googleKey||"").trim();
+  if(!key) throw {code:"NOKEY"};
+  const body = { textQuery: query, maxResultCount:1, languageCode:"zh-TW", regionCode:"TW" };
+  if(bias && bias.lat!=null) body.locationBias = {circle:{center:{latitude:bias.lat, longitude:bias.lng}, radius:25000}};
+  const r = await fetch(GPLACES, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "X-Goog-Api-Key":key, "X-Goog-FieldMask":"places.location,places.displayName" },
+    body: JSON.stringify(body)
+  });
+  if(r.status===401 || r.status===403) throw {code:"AUTH", status:r.status};
+  if(!r.ok) throw {code:"HTTP", status:r.status};
   const j = await r.json();
-  return (j.features||[]).map(function(f){
-    const p=f.properties||{}, c=(f.geometry&&f.geometry.coordinates)||[];
-    const area=[p.district, p.city, p.state].filter(Boolean).join(" ");
-    const addr=[ [p.housenumber,p.street].filter(Boolean).join("") , area ].filter(Boolean).join("，");
-    return { name:p.name||p.street||q, lat:c[1], lng:c[0], addr:addr, area:area };
-  }).filter(function(x){ return typeof x.lat==="number"; });
+  const p = (j.places||[])[0];
+  if(!p || !p.location) return null;
+  return { lat:p.location.latitude, lng:p.location.longitude, name:(p.displayName&&p.displayName.text)||query };
 }
 function haversineKm(aLat,aLng,bLat,bLng){
   const R=6371, t=Math.PI/180;
@@ -959,8 +946,8 @@ function haversineKm(aLat,aLng,bLat,bLng){
   const s=Math.sin(dLat/2)**2 + Math.cos(aLat*t)*Math.cos(bLat*t)*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.min(1,Math.sqrt(s)));
 }
-const WALK_KM = 0.5;        // 0.5 公里內 → 步行可到
-const MIN_PER_KM = 2.8;     // 直線公里 → 估計車程分鐘（市區概估）
+const WALK_KM = 0.5;
+const MIN_PER_KM = 2.8;
 const MIN_BUCKETS = [[5,"車程5分鐘內"],[10,"車程10分鐘內"],[15,"車程15分鐘內"],[20,"車程20分鐘內"]];
 function minutesToBucket(min){ for(const b of MIN_BUCKETS){ if(min<=b[0]) return b[1]; } return "車程20分鐘以上"; }
 /* ★ 未來要換「精確車程」只改這個函式：改成 await 呼叫 OSRM / OpenRouteService 即可，其它都不用動 */
@@ -978,74 +965,54 @@ async function distanceBucketFor(home, s){
   return minutesToBucket(await estimateDriveMinutes(home, s));
 }
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+function authHint(e){ return (e&&e.code==="AUTH")
+  ? "Google 金鑰被拒（HTTP "+e.status+"）。請確認：① 已啟用 Places API (New)；② 已開通計費；③ 金鑰的『網站(HTTP referrer)』限制有包含這個網址。"
+  : "查詢失敗，請檢查網路或金鑰。"; }
 
 async function setHomeFromInput(){
   const q = ($("#set-homeq").value||"").trim();
   if(!q){ alert("請先輸入住家地址或附近地標。"); return; }
+  if(!(state.settings.googleKey||"").trim()){ alert("請先在上面填入 Google API 金鑰。"); return; }
   const btn=$("#btn-homeset"); if(btn){ btn.disabled=true; btn.textContent="查詢中…"; }
   try{
-    const res = await photonSearch(q, searchBias(), 1);
-    if(!res.length){ alert("查不到這個地點，換個地標或路名再試（OpenStreetMap 對巷弄門牌不一定有）。"); return; }
-    state.settings.home = {label:(res[0].name||q)+(res[0].area?("，"+res[0].area):""), lat:res[0].lat, lng:res[0].lng};
+    const g = await googleGeocode(q, state.settings.home);
+    if(!g){ alert("查不到這個地點，換個地標或地址再試。"); return; }
+    state.settings.home = {label:(g.name||q), lat:g.lat, lng:g.lng};
     save(); renderSettings(); toast("已設定家的位置");
-  }catch(e){ alert("查詢失敗，請檢查網路後再試。"); }
+  }catch(e){ alert(e&&e.code==="NOKEY" ? "請先填入 Google API 金鑰。" : authHint(e)); }
   finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="查詢"; } }
 }
 
 async function autoFillDistances(){
   const home = state.settings.home;
   if(!home || home.lat==null){ alert("請先在上面設定『家的位置』。"); return; }
+  if(!(state.settings.googleKey||"").trim()){ alert("請先在上面填入 Google API 金鑰。"); return; }
   const todo = state.stores.filter(function(s){ return !s.distance; });
   if(!todo.length){ alert("所有店家都已經有距離了 🙂"); return; }
-  if(!confirm("要幫 "+todo.length+" 間「沒有距離」的店家自動推算嗎？\n（使用 OpenStreetMap，需要網路，可能要幾十秒）")) return;
+  if(!confirm("要用 Google 幫 "+todo.length+" 間「沒有距離」的店家自動推算嗎？\n（只會存「車程X分鐘內」級距，不保留座標）")) return;
   const btn=$("#btn-autodist"); if(btn) btn.disabled=true;
-  let filled=0; const problems=[];
+  let filled=0; const problems=[]; let aborted=null;
   for(let i=0;i<todo.length;i++){
     const s=todo[i];
     if(btn) btn.textContent="處理中… "+(i+1)+"/"+todo.length;
     try{
-      if(s.lat==null){
-        const res = await photonSearch(s.name, home, 1); // 不加「台中」：靠 home 偏好定位即可（OSM 用「臺」字，加「台中」反而查無）
-        await sleep(1100); // 善待公共服務
-        if(!res.length){ problems.push(s.name); continue; }
-        s.lat=res[0].lat; s.lng=res[0].lng;
-      }
-      const bucket = await distanceBucketFor(home, s);
+      const g = await googleGeocode(s.name, home);
+      if(!g){ problems.push(s.name); continue; }
+      const bucket = await distanceBucketFor(home, {lat:g.lat, lng:g.lng}); // 算完即丟座標
       if(!bucket){ problems.push(s.name); continue; }
-      s.distance=bucket; s.updatedAt=Date.now(); filled++;
-    }catch(e){ problems.push(s.name); }
+      s.distance = bucket; s.updatedAt=Date.now(); filled++;
+      await sleep(120);
+    }catch(e){
+      if(e && (e.code==="AUTH"||e.code==="NOKEY")){ aborted=e; break; }
+      problems.push(s.name);
+    }
   }
   save(); renderStores(); renderSettings(); if(currentTab==="home") renderHome();
   const b=$("#btn-autodist"); if(b){ b.disabled=false; b.textContent="開始"; }
+  if(aborted){ alert(aborted.code==="NOKEY" ? "請先填入 Google API 金鑰。" : authHint(aborted)); return; }
   let msg="完成！已自動填上 "+filled+" 間的距離。";
   if(problems.length){ msg += "\n\n有 "+problems.length+" 間查不到、已略過（請手動設定距離）：\n" + problems.slice(0,20).join("、") + (problems.length>20?" …":""); }
   alert(msg);
-}
-
-/* 店名自動完成 */
-let acTimer=null, acSeq=0, acResults=[];
-function hideAC(){ const el=$("#nameAC"); if(el){ el.classList.remove("show"); el.innerHTML=""; } acResults=[]; }
-async function runAC(q){
-  const seq = ++acSeq;
-  const hint=$("#acHint"); if(hint) hint.textContent="搜尋中…";
-  let res=[];
-  try{ res = await photonSearch(q, searchBias(), 6); }catch(e){ res=[]; }
-  if(seq!==acSeq) return;
-  if(hint) hint.textContent = res.length ? "" : "查不到（直接打字也可以，最後一樣連得到 Google 地圖）";
-  acResults = res;
-  const el=$("#nameAC"); if(!el) return;
-  if(!res.length){ hideAC(); return; }
-  el.innerHTML = res.map(function(r,i){ return '<div class="ac-item" data-i="'+i+'"><div class="nm">'+esc(r.name)+'</div>'+(r.addr?'<div class="ad">'+esc(r.addr)+'</div>':'')+'</div>'; }).join("")
-    + '<div class="ac-foot">地點 © OpenStreetMap</div>';
-  el.classList.add("show");
-}
-function pickAC(i){
-  const r=acResults[i]; if(!r||!formStore) return;
-  formStore.name=r.name; formStore.lat=r.lat; formStore.lng=r.lng;
-  if(!formStore.location && r.addr) formStore.location=r.addr;
-  $("#f-name").value=r.name; $("#f-location").value=formStore.location||"";
-  const hint=$("#acHint"); if(hint) hint.textContent="已帶入座標 ✓ 之後可一鍵自動算距離";
-  hideAC();
 }
 
 /* ---------- Modal 控制 ---------- */
@@ -1093,18 +1060,7 @@ $("#formGroups").addEventListener("click", e=>{
   }
   renderFormGroups();
 });
-$("#f-name").addEventListener("input", e=>{
-  if(!formStore) return;
-  formStore.name=e.target.value;
-  formStore.lat=null; formStore.lng=null; // 手動改名 → 座標失效，需重新挑選
-  const q=(e.target.value||"").trim();
-  clearTimeout(acTimer);
-  if(q.length<2){ hideAC(); const h=$("#acHint"); if(h) h.textContent=""; return; }
-  acTimer=setTimeout(()=>runAC(q), 280);
-});
-$("#nameAC").addEventListener("mousedown", e=>{ const it=e.target.closest(".ac-item"); if(it){ e.preventDefault(); pickAC(+it.dataset.i); } });
-$("#f-name").addEventListener("blur", ()=> setTimeout(hideAC, 160));
-$("#f-name").addEventListener("keydown", e=>{ if(e.key==="Escape") hideAC(); });
+$("#f-name").addEventListener("input", e=>{ if(formStore) formStore.name=e.target.value; });
 $("#formSave").onclick = saveForm;
 $("#formCancel").onclick = ()=> hideModal("#formModal");
 $("#formDelete").onclick = deleteStore;
