@@ -322,7 +322,6 @@
   <div id="filters"></div>
   <label class="switchrow"><span>避開最近吃過的 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><input type="checkbox" id="avoidToggle"></label>
   <label class="switchrow"><span>排除有人「不喜歡」的店 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg></span><input type="checkbox" id="dislikeToggle"></label>
-  <label class="switchrow"><span>排除車程30分鐘以上 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 1.8"/></svg></span><input type="checkbox" id="farToggle"></label>
 </section>
 
 <!-- 決定列（固定底部） -->
@@ -388,7 +387,7 @@ const CATS = [
   {key:"staple",  label:"主食", multi:true},
   {key:"cuisine", label:"菜系", multi:true},
   {key:"meals",   label:"餐別", multi:true},
-  {key:"distance",label:"距離", multi:false},
+  {key:"distance",label:"車程距離", multi:false},
   {key:"price",   label:"價位", multi:false},
 ];
 const CAT_LABEL = Object.fromEntries(CATS.map(c=>[c.key,c.label]));
@@ -396,14 +395,14 @@ const DEFAULT_TAGS = {
   staple:["麵","飯","鍋物","麵食","其他"],
   cuisine:["中式","西式","日式","東南亞","韓式","其他"],
   meals:["早餐","午餐","晚餐","宵夜"],
-  distance:["步行可到","車程5分鐘內","車程10分鐘內","車程15分鐘內","車程20分鐘內","車程20~30分鐘","車程30分鐘以上"],
+  distance:["步行可到","5分鐘內","10分鐘內","15分鐘內","20分鐘內","20~30分鐘","30分鐘以上"],
   price:["100以內","100~200","200~300","300~500","500以上"],
 };
 const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, excludeFar:false, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -416,7 +415,10 @@ function toArr(v){
 }
 function toStr(v){ const x = Array.isArray(v) ? (v.length?v[0]:"") : (v==null?"":v); return String(x).trim(); }
 function numOrNull(v){ const n=parseFloat(v); return isFinite(n)? n : null; }
-function migrateDistance(v){ return v==="車程20分鐘以上" ? "車程20~30分鐘" : v; }
+function migrateDistance(v){
+  if(v==="車程20分鐘以上") return "20~30分鐘";
+  return (v && v.indexOf("車程")===0) ? v.slice(2) : v;
+}
 function normStore(s){
   s = s || {};
   const pick=(...keys)=>{ for(const k of keys){ const val=s[k]; if(val!=null && val!=="") return val; } return undefined; };
@@ -458,7 +460,6 @@ function normalize(d){
   out.settings.homeHintDismissed = !!out.settings.homeHintDismissed;
   out.settings.drawIntroSeen = !!out.settings.drawIntroSeen;
   out.settings.chainNearest = out.settings.chainNearest!==false;
-  out.settings.excludeFar = !!out.settings.excludeFar;
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
 }
@@ -548,7 +549,7 @@ function renderFilters(){
         const mark = (selIdx>=0 && i<=selIdx) ? "✓ " : "";
         return `<button class="${cls}" data-cat="distance" data-opt="${esc(o)}">${mark}${esc(o)}</button>`;
       }).join("");
-      html += `<div class="fgroup"><div class="fglabel">距離 <span class="muted">（選最遠可接受，含更近的）</span></div><div class="chips">${dchips}</div></div>`;
+      html += `<div class="fgroup"><div class="fglabel">車程距離 <span class="muted">（選最遠可接受，含更近的）</span></div><div class="chips">${dchips}</div></div>`;
       continue;
     }
     const chips = opts.map(o=>{
@@ -586,7 +587,6 @@ function collapseChains(list){
 function currentCandidates(){
   let c = state.stores.filter(matchesFilters);
   if(state.settings.excludeDisliked) c = c.filter(s=> (s.votes||[]).indexOf("no")<0);
-  if(state.settings.excludeFar) c = c.filter(s=> s.distance!=="車程30分鐘以上");
   c = collapseChains(c);
   return c;
 }
@@ -601,7 +601,6 @@ function renderHome(){
   renderFilters();
   $("#avoidToggle").checked = state.settings.avoidRecent;
   $("#dislikeToggle").checked = state.settings.excludeDisliked;
-  $("#farToggle").checked = state.settings.excludeFar;
   updateCount();
 }
 
@@ -712,7 +711,7 @@ function renderResultInfo(s){
   const rows=[];
   const add=(k,v)=>{ if(v) rows.push(`<div class="ri"><span class="k">${k}</span><span>${esc(v)}</span></div>`); };
   add("主食", (s.staple||[]).join("、")); add("菜系", (s.cuisine||[]).join("、"));
-  add("餐別", (s.meals||[]).join("、")); add("距離", s.distance); add("價位", s.price);
+  add("餐別", (s.meals||[]).join("、")); add("車程距離", s.distance); add("價位", s.price);
   add("地點", s.location); add("備註", s.note);
   $("#r-info").innerHTML = rows.join("") || '<div class="ri"><span class="k">　</span><span class="k">（沒有其他資訊）</span></div>';
 }
@@ -1170,8 +1169,8 @@ function haversineKm(aLat,aLng,bLat,bLng){
 }
 const WALK_KM = 0.5;
 const MIN_PER_KM = 2.8;
-const MIN_BUCKETS = [[5,"車程5分鐘內"],[10,"車程10分鐘內"],[15,"車程15分鐘內"],[20,"車程20分鐘內"],[30,"車程20~30分鐘"]];
-function minutesToBucket(min){ for(const b of MIN_BUCKETS){ if(min<=b[0]) return b[1]; } return "車程30分鐘以上"; }
+const MIN_BUCKETS = [[5,"5分鐘內"],[10,"10分鐘內"],[15,"15分鐘內"],[20,"20分鐘內"],[30,"20~30分鐘"]];
+function minutesToBucket(min){ for(const b of MIN_BUCKETS){ if(min<=b[0]) return b[1]; } return "30分鐘以上"; }
 /* ★ 未來要換「精確車程」只改這個函式：改成 await 呼叫 OSRM / OpenRouteService 即可，其它都不用動 */
 async function estimateDriveMinutes(home, s){
   const km = haversineKm(home.lat, home.lng, s.lat, s.lng);
@@ -1310,7 +1309,6 @@ $("#decideBtn").onclick = decide;
 $("#clearFilters").onclick = ()=>{ clearFilters(); renderHome(); };
 $("#avoidToggle").onchange = e=>{ state.settings.avoidRecent=e.target.checked; save(); };
 $("#dislikeToggle").onchange = e=>{ state.settings.excludeDisliked=e.target.checked; save(); updateCount(); };
-$("#farToggle").onchange = e=>{ state.settings.excludeFar=e.target.checked; save(); updateCount(); };
 $("#filters").addEventListener("click", e=>{
   const b = e.target.closest(".chip"); if(!b) return;
   if(b.dataset.cat==="distance") setDistanceThreshold(b.dataset.opt);
