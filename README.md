@@ -105,7 +105,8 @@ python3 -m http.server 8000
 ---
 
 ## 其他功能
-- **一鍵自動算距離**（需自備 Google API 金鑰）：「設定 →距離設定」填入金鑰、設好「家的位置」，按「開始」，就會用 Google 幫**還沒填距離**的店家推算距離。**只會存「車程X分鐘內」級距、不保留座標**；查不到的店會列出並略過；**不會覆蓋**已填好的距離。金鑰只存在你的瀏覽器、不會上傳。設定方式見下方。
+- **一鍵自動算距離**：「設定 →距離設定」設好「家的位置」、按「開始」，就會用 Google 幫**還沒填距離**的店家推算距離。**只會存「車程X分鐘內」級距、不保留座標**；查不到的店會列出並略過；**不會覆蓋**已填好的距離。
+  - Google 金鑰**藏在後端代理（Cloudflare Worker）**，不會出現在前端網頁——所以這個 App 可以公開給別人用、使用者不用自備金鑰。部署方式見下方。
   - 目前是**直線距離估算**；之後會升級成 OSRM／OpenRouteService 的**實際車程**（程式已預留切換點）。
 - **兩人否決權**：可在「設定 →否決權成員」改兩個人的名字，讓這個 App 也能給別人用。
 - **Google 地圖導航**：選定店家後自動開啟 Google 地圖、直接帶到導航；可在「設定 →選定後開啟 Google 地圖」關閉。
@@ -117,17 +118,28 @@ python3 -m http.server 8000
 ## 技術說明（給之後想維護的人）
 - 單檔 `index.html`，內含 HTML / CSS / vanilla JavaScript，無任何相依套件或 CDN。
 - 所有資料存在 `localStorage` 的 `eat-what-data` 這個 key，結構為單一 JSON 物件：
-  `{ version, stores[], tagOptions, log[], settings }`。店家**不存座標**（算距離時即時取得、用完即丟，只留級距）；`settings.home` 是距離基準點、`settings.googleKey` 是金鑰（都只在本機，不進 repo）。
-- **距離估算**：座標來自 `googleGeocode()`（Google Places API New 的 `searchText`，前端直接 fetch、支援 CORS）。距離換算集中在 `estimateDriveMinutes(home, s)`：目前回傳「直線公里 × `MIN_PER_KM`」，要換**實際車程**只改這個函式（改成 `await` 呼叫 OSRM `router.project-osrm.org/route/v1/driving/...` 取 `duration/60`，或 OpenRouteService），其他都不用動——檔案裡有註解範例。
+  `{ version, stores[], tagOptions, log[], settings }`。店家**不存座標**（算距離時即時取得、用完即丟，只留級距）；`settings.home` 是距離基準點。
+- **距離查詢**：前端 `googleGeocode()` 打 `DISTANCE_PROXY`（`index.html` 最上面的常數，填你的 Worker 網址）；Worker（見 `worker.js`）持金鑰、再打 Google Places API (New) 的 `searchText`，回傳 `{result:{lat,lng,name}}`。金鑰只在 Worker、不在前端。
+- **距離換算**集中在 `estimateDriveMinutes(home, s)`：目前回傳「直線公里 × `MIN_PER_KM`」，要換**實際車程**只改這個函式（改成 `await` 呼叫 OSRM `router.project-osrm.org/route/v1/driving/...` 取 `duration/60`，或 OpenRouteService），其他都不用動——檔案裡有註解範例。
 - 之後想加新功能，資料結構已預留空間，直接擴充即可。
 
 ---
 
-## 取得 Google API 金鑰（只有「自動算距離」需要）
-個人用量通常在免費額度內，但 Google 要求綁一張信用卡。
-1. 到 [Google Cloud Console](https://console.cloud.google.com/) 建立一個專案。
-2. 「API 和服務 →啟用 API」啟用 **Places API (New)**。
-3. 「帳單 Billing」開通計費。
-4. 「憑證 →建立憑證 →API 金鑰」，複製金鑰。
-5. （建議）編輯金鑰：應用程式限制選「**網站**」，加入你的網址（例：`https://a23860276-jpg.github.io/*`）；API 限制只勾「Places API (New)」。
-6. 把金鑰貼到 App「**設定 →距離設定 →Google API 金鑰**」按儲存。
+## 設定「自動算距離」的後端代理（Cloudflare Worker）
+金鑰藏在 Worker，使用者不必自備金鑰。一次設定，之後都不用再碰。
+
+**前提**：先有 Google API 金鑰（Cloud Console → 啟用 **Places API (New)** → 開通計費 → 建立 API 金鑰）。
+
+**部署 Worker：**
+1. 註冊 [Cloudflare](https://dash.cloudflare.com/)（免費）。
+2. **Workers & Pages → Create → Worker** → 命名（例 `eat-dist`）→ Deploy。
+3. **Edit code**，把專案裡 [`worker.js`](worker.js) 的內容整個貼上 → Deploy。
+4. **Settings → Variables and Secrets** 加兩個：
+   - `GOOGLE_KEY`（類型 **Secret**）= 你的 Google API 金鑰
+   - `ALLOWED_ORIGIN`（類型 **Text**）= 你的網站來源，例：`https://a23860276-jpg.github.io`（只到網域、不要斜線）
+5. 複製這個 Worker 的網址（像 `https://eat-dist.xxxx.workers.dev`）。
+6. 把網址填到 `index.html` 最上面的 **`DISTANCE_PROXY`** 常數，存檔、Push。
+
+**安全（必做）**：到 Google Cloud → Places API (New) → **配額**設每日上限，當作被亂用時的最後防線。金鑰原本的「網站」限制可保留不動（Worker 會帶對應的 Referer）。
+
+> 想換 Google 金鑰或之後改用別家，只要動 Worker、前端完全不用改。

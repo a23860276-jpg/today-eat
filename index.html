@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ff5e3a">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="今天吃什麼">
@@ -304,6 +307,8 @@
 
 /* ---------- 資料層 ---------- */
 const KEY = "eat-what-data";
+// ★ 上架用：部署 Cloudflare Worker（見 worker.js）後，把下面換成你的 Worker 網址 ★
+const DISTANCE_PROXY = "https://eat-dist.a23860276.workers.dev";
 const CATS = [
   {key:"staple",  label:"主食", multi:true},
   {key:"cuisine", label:"菜系", multi:true},
@@ -750,13 +755,11 @@ function renderSettings(){
     </div>
 
     <div class="sect">
-      <h2>距離設定（Google）</h2>
-      <div class="row"><div class="lbl">Google API 金鑰<small>自動算距離用；金鑰只存在你的瀏覽器、不會上傳</small></div></div>
-      <div class="row" style="gap:8px"><input class="nameinput" id="set-gkey" type="password" style="flex:1; width:auto" placeholder="貼上 Google API 金鑰" value="${esc(st.googleKey||"")}"><button class="btn ghost" id="btn-gkey" style="flex:0 0 auto">儲存</button></div>
+      <h2>距離設定</h2>
       <div class="row"><div class="lbl">家的位置<small>距離的基準點｜目前：${esc((st.home&&st.home.label)||"未設定")}</small></div></div>
       <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
       <div class="row"><div class="lbl">一鍵自動算距離<small>用 Google 幫「還沒填距離」的店推算；只存級距、不存座標；查不到會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
-      <div class="ver" style="text-align:left;margin:6px 2px 2px">建議在 Google Cloud 限制此金鑰只用於「Places API (New)」與你的網站網址。</div>
+      <div class="ver" style="text-align:left;margin:6px 2px 2px">距離查詢透過你的代理（金鑰藏在後端、不在前端）。導航 © Google。</div>
     </div>
 
     <div class="sect">
@@ -793,7 +796,6 @@ function renderSettings(){
   $("#set-maps").onchange  = e=>{ state.settings.openMaps=e.target.checked; save(); };
   $("#set-user1").onchange = e=>{ state.settings.user1=(e.target.value||"").trim().slice(0,8)||"我"; e.target.value=state.settings.user1; save(); };
   $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"太太"; e.target.value=state.settings.user2; save(); };
-  if($("#btn-gkey")) $("#btn-gkey").onclick = ()=>{ state.settings.googleKey=($("#set-gkey").value||"").trim(); save(); toast(state.settings.googleKey?"已儲存金鑰":"已清除金鑰"); };
   if($("#btn-homeset")) $("#btn-homeset").onclick = setHomeFromInput;
   if($("#btn-autodist")) $("#btn-autodist").onclick = autoFillDistances;
   $("#aw-minus").onclick = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow-1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
@@ -921,24 +923,18 @@ function loadSamples(){
 }
 
 /* ---------- 距離（Google Places API New 取座標 → 只存級距、不存座標；之後可換 OSRM 精確版） ---------- */
-const GPLACES = "https://places.googleapis.com/v1/places:searchText";
-// 用 Google 把「店名/地址」轉成座標（暫時用、用完即丟）。需使用者自備 Google API 金鑰。
+function proxyReady(){ return !!DISTANCE_PROXY && DISTANCE_PROXY.indexOf("YOUR-WORKER")<0; }
+// 透過你的 Cloudflare Worker 代理查座標（Google 金鑰藏在 Worker 後端，不在前端）
 async function googleGeocode(query, bias){
-  const key = (state.settings.googleKey||"").trim();
-  if(!key) throw {code:"NOKEY"};
-  const body = { textQuery: query, maxResultCount:1, languageCode:"zh-TW", regionCode:"TW" };
-  if(bias && bias.lat!=null) body.locationBias = {circle:{center:{latitude:bias.lat, longitude:bias.lng}, radius:25000}};
-  const r = await fetch(GPLACES, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json", "X-Goog-Api-Key":key, "X-Goog-FieldMask":"places.location,places.displayName" },
-    body: JSON.stringify(body)
-  });
+  if(!proxyReady()) throw {code:"NOPROXY"};
+  const body = { q: query };
+  if(bias && bias.lat!=null){ body.lat=bias.lat; body.lng=bias.lng; }
+  const r = await fetch(DISTANCE_PROXY, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   if(r.status===401 || r.status===403) throw {code:"AUTH", status:r.status};
   if(!r.ok) throw {code:"HTTP", status:r.status};
   const j = await r.json();
-  const p = (j.places||[])[0];
-  if(!p || !p.location) return null;
-  return { lat:p.location.latitude, lng:p.location.longitude, name:(p.displayName&&p.displayName.text)||query };
+  if(!j || !j.result) return null;
+  return { lat:j.result.lat, lng:j.result.lng, name:j.result.name||query };
 }
 function haversineKm(aLat,aLng,bLat,bLng){
   const R=6371, t=Math.PI/180;
@@ -966,27 +962,27 @@ async function distanceBucketFor(home, s){
 }
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
 function authHint(e){ return (e&&e.code==="AUTH")
-  ? "Google 金鑰被拒（HTTP "+e.status+"）。請確認：① 已啟用 Places API (New)；② 已開通計費；③ 金鑰的『網站(HTTP referrer)』限制有包含這個網址。"
-  : "查詢失敗，請檢查網路或金鑰。"; }
+  ? "距離服務被拒（HTTP "+e.status+"）。請檢查你的 Worker（GOOGLE_KEY、ALLOWED_ORIGIN）以及 Google 端的計費／Places API (New)／配額。"
+  : "查詢失敗，請檢查網路或代理設定。"; }
 
 async function setHomeFromInput(){
   const q = ($("#set-homeq").value||"").trim();
   if(!q){ alert("請先輸入住家地址或附近地標。"); return; }
-  if(!(state.settings.googleKey||"").trim()){ alert("請先在上面填入 Google API 金鑰。"); return; }
+  if(!proxyReady()){ alert("距離服務尚未設定：請把你的 Cloudflare Worker 網址填到 index.html 最上面的 DISTANCE_PROXY。"); return; }
   const btn=$("#btn-homeset"); if(btn){ btn.disabled=true; btn.textContent="查詢中…"; }
   try{
     const g = await googleGeocode(q, state.settings.home);
     if(!g){ alert("查不到這個地點，換個地標或地址再試。"); return; }
     state.settings.home = {label:(g.name||q), lat:g.lat, lng:g.lng};
     save(); renderSettings(); toast("已設定家的位置");
-  }catch(e){ alert(e&&e.code==="NOKEY" ? "請先填入 Google API 金鑰。" : authHint(e)); }
+  }catch(e){ alert(e&&e.code==="NOPROXY" ? "距離服務尚未設定（DISTANCE_PROXY）。" : authHint(e)); }
   finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="查詢"; } }
 }
 
 async function autoFillDistances(){
   const home = state.settings.home;
   if(!home || home.lat==null){ alert("請先在上面設定『家的位置』。"); return; }
-  if(!(state.settings.googleKey||"").trim()){ alert("請先在上面填入 Google API 金鑰。"); return; }
+  if(!proxyReady()){ alert("距離服務尚未設定：請把你的 Cloudflare Worker 網址填到 index.html 最上面的 DISTANCE_PROXY。"); return; }
   const todo = state.stores.filter(function(s){ return !s.distance; });
   if(!todo.length){ alert("所有店家都已經有距離了 🙂"); return; }
   if(!confirm("要用 Google 幫 "+todo.length+" 間「沒有距離」的店家自動推算嗎？\n（只會存「車程X分鐘內」級距，不保留座標）")) return;
@@ -1003,13 +999,13 @@ async function autoFillDistances(){
       s.distance = bucket; s.updatedAt=Date.now(); filled++;
       await sleep(120);
     }catch(e){
-      if(e && (e.code==="AUTH"||e.code==="NOKEY")){ aborted=e; break; }
+      if(e && (e.code==="AUTH"||e.code==="NOPROXY")){ aborted=e; break; }
       problems.push(s.name);
     }
   }
   save(); renderStores(); renderSettings(); if(currentTab==="home") renderHome();
   const b=$("#btn-autodist"); if(b){ b.disabled=false; b.textContent="開始"; }
-  if(aborted){ alert(aborted.code==="NOKEY" ? "請先填入 Google API 金鑰。" : authHint(aborted)); return; }
+  if(aborted){ alert(aborted.code==="NOPROXY" ? "距離服務尚未設定（DISTANCE_PROXY）。" : authHint(aborted)); return; }
   let msg="完成！已自動填上 "+filled+" 間的距離。";
   if(problems.length){ msg += "\n\n有 "+problems.length+" 間查不到、已略過（請手動設定距離）：\n" + problems.slice(0,20).join("、") + (problems.length>20?" …":""); }
   alert(msg);
