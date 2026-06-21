@@ -237,6 +237,44 @@
 
   @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
 
+  /* 新手教學 */
+  #onb-auto{ scroll-margin-top:90px; }
+  #tour{ position:fixed; inset:0; z-index:2000; display:none; }
+  #tour.show{ display:block; }
+  #tourRing{ position:fixed; top:-60px; left:-60px; width:0; height:0; border-radius:14px;
+    box-shadow:0 0 0 9999px rgba(12,15,18,.68); pointer-events:none;
+    transition:top .35s cubic-bezier(.4,0,.2,1), left .35s cubic-bezier(.4,0,.2,1), width .35s cubic-bezier(.4,0,.2,1), height .35s cubic-bezier(.4,0,.2,1); }
+  #tourRing::after{ content:""; position:absolute; inset:-3px; border-radius:16px; border:2px solid var(--brand);
+    animation:tourpulse 1.7s ease-out infinite; }
+  #tourRing.notarget::after{ display:none; }
+  @keyframes tourpulse{ 0%{ box-shadow:0 0 0 0 rgba(255,122,69,.45);} 100%{ box-shadow:0 0 0 12px rgba(255,122,69,0);} }
+  #tourCard{ position:fixed; left:16px; right:16px; max-width:520px; margin:0 auto; box-sizing:border-box;
+    background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px 18px 16px;
+    box-shadow:0 24px 60px rgba(0,0,0,.45); max-height:74vh; overflow:auto; }
+  .tour-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .tour-step{ font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--brand);
+    background:rgba(255,122,69,.12); padding:3px 10px; border-radius:999px; }
+  .tour-skip{ background:none; border:none; color:var(--muted); font-size:13px; padding:4px 6px; cursor:pointer; }
+  .tour-title{ font-size:19px; font-weight:800; line-height:1.35; margin-bottom:8px; }
+  .tour-body{ font-size:14.5px; line-height:1.7; color:var(--text); white-space:pre-line; opacity:.92; }
+  .tour-nav{ display:flex; gap:10px; margin-top:16px; }
+  .tour-prev{ background:none; border:1px solid var(--line); color:var(--muted); border-radius:12px; padding:11px 14px; font-size:14px; font-weight:600; cursor:pointer; }
+  .tour-next{ flex:1; background:var(--grad); color:#fff; border:none; border-radius:12px; padding:11px 16px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 8px 20px rgba(255,86,48,.3); }
+  /* 家的位置提醒 */
+  #homeHint:empty{ display:none; }
+  .homehint{ display:flex; align-items:center; gap:10px; margin:0 0 12px;
+    background:linear-gradient(135deg, rgba(255,122,69,.15), rgba(255,86,48,.07));
+    border:1px solid rgba(255,122,69,.32); border-radius:14px; padding:11px 12px; }
+  .hh-ic{ flex:0 0 auto; color:var(--brand); display:flex; }
+  .hh-ic svg{ width:22px; height:22px; }
+  .hh-tx{ flex:1; font-size:13.5px; line-height:1.5; color:var(--text); }
+  .hh-tx b{ color:var(--brand); font-weight:700; }
+  .hh-go{ flex:0 0 auto; background:var(--grad); color:#fff; border:none; border-radius:10px;
+    padding:8px 12px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .hh-x{ flex:0 0 auto; background:none; border:none; color:var(--muted); font-size:15px; cursor:pointer; padding:2px 5px; line-height:1; }
+  .hh-warn{ color:var(--brand); font-weight:600; }
+  .row.flash{ animation:rowflash 1.6s ease; }
+  @keyframes rowflash{ 0%,100%{ background:transparent; } 25%,60%{ background:rgba(255,122,69,.16); } }
 </style>
 </head>
 <body class="tab-home">
@@ -248,6 +286,7 @@
 
 <!-- 決定 -->
 <section id="view-home" class="view active">
+  <div id="homeHint"></div>
   <div class="hint">點一下＝<b class="t-inc">要</b>，再點一下＝<b class="t-exc">不要</b>，再點＝不限。沒選的就不限制。</div>
   <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
   <div id="filters"></div>
@@ -333,7 +372,7 @@ const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"太太", googleKey:"", home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"太太", googleKey:"", homeSet:false, homeHintDismissed:false, home:Object.assign({},DEFAULT_HOME)}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -382,6 +421,8 @@ function normalize(d){
   out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "太太";
   var _h = d.settings && d.settings.home; out.settings.home = (_h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||DEFAULT_HOME.label), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng), area:String(_h.area||"")||DEFAULT_HOME.area} : Object.assign({},DEFAULT_HOME);
   out.settings.googleKey = String(out.settings.googleKey||"");
+  out.settings.homeSet = !!out.settings.homeSet;
+  out.settings.homeHintDismissed = !!out.settings.homeHintDismissed;
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
 }
@@ -496,6 +537,7 @@ function updateCount(){
   el.classList.toggle("zero", n===0 && state.stores.length>0);
 }
 function renderHome(){
+  renderHomeHint();
   renderFilters();
   $("#avoidToggle").checked = state.settings.avoidRecent;
   $("#dislikeToggle").checked = state.settings.excludeDisliked;
@@ -759,13 +801,18 @@ function renderSettings(){
       <div class="row"><div class="lbl">選定後開啟 Google 地圖<small>按「就吃這間」後自動帶你導航</small></div><input type="checkbox" id="set-maps" ${st.openMaps?"checked":""}></div>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="onb-auto">
       <h2>自動填寫（需網路）</h2>
-      <div class="row"><div class="lbl">家的位置<small>距離的基準點｜目前：${esc((st.home&&st.home.label)||"未設定")}</small></div></div>
+      <div class="row"><div class="lbl">家的位置<small>距離的基準點｜${st.homeSet?("目前："+esc((st.home&&st.home.label)||"")):"<span class='hh-warn'>尚未設定（先用預設位置）</span>"}</small></div></div>
       <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
       <div class="row"><div class="lbl">一鍵自動算距離<small>自動幫「還沒填距離」的店估算距離；找不到的會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
       <div class="row"><div class="lbl">一鍵自動分類（AI 判讀）<small>自動幫「還沒分類」的店填主食／菜系／餐別／價位（不含距離）；填完建議檢查一下</small></div><button class="btn ghost" id="btn-autoclass">開始</button></div>
       <div class="ver" style="text-align:left;margin:6px 2px 2px">距離與分類為自動估算，僅供參考。導航由 Google 地圖提供。</div>
+    </div>
+
+    <div class="sect">
+      <h2>說明</h2>
+      <div class="row"><div class="lbl">新手教學<small>重新看一次操作導覽</small></div><button class="btn ghost" id="btn-tour">開始</button></div>
     </div>
 
     <div class="sect">
@@ -803,6 +850,7 @@ function renderSettings(){
   $("#set-user1").onchange = e=>{ state.settings.user1=(e.target.value||"").trim().slice(0,8)||"我"; e.target.value=state.settings.user1; save(); };
   $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"太太"; e.target.value=state.settings.user2; save(); };
   if($("#btn-homeset")) $("#btn-homeset").onclick = setHomeFromInput;
+  if($("#btn-tour")) $("#btn-tour").onclick = function(){ startTour(); };
   if($("#btn-autodist")) $("#btn-autodist").onclick = autoFillDistances;
   if($("#btn-autoclass")) $("#btn-autoclass").onclick = autoClassify;
   $("#aw-minus").onclick = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow-1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
@@ -982,7 +1030,8 @@ async function setHomeFromInput(){
     const g = await googleGeocode(q, state.settings.home, true);
     if(!g){ alert("查不到這個地點，換個地標或地址再試。"); return; }
     state.settings.home = {label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""};
-    save(); renderSettings(); toast("已設定家的位置");
+    state.settings.homeSet = true;
+    save(); renderSettings(); renderHomeHint(); toast("已設定家的位置");
   }catch(e){ alert(e&&e.code==="NOPROXY" ? "此功能暫時無法使用。" : authHint(e)); }
   finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="查詢"; } }
 }
@@ -1144,6 +1193,121 @@ mergeInput.type="file"; mergeInput.accept="application/json,.json"; mergeInput.i
 mergeInput.addEventListener("change", e=>{ const f=e.target.files[0]; if(f) importMerge(f); e.target.value=""; });
 document.body.appendChild(mergeInput);
 
+/* ---------- 家的位置提醒 ---------- */
+function renderHomeHint(){
+  const el = $("#homeHint"); if(!el) return;
+  if(state.settings.homeSet || state.settings.homeHintDismissed){ el.innerHTML=""; return; }
+  el.innerHTML =
+    '<div class="homehint">'+
+      '<span class="hh-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>'+
+      '<div class="hh-tx">設定你家的位置，就能<b>自動算距離、自動分類</b>，抽選也更準～</div>'+
+      '<button class="hh-go" id="hhGo">去設定</button>'+
+      '<button class="hh-x" id="hhClose" aria-label="關閉">✕</button>'+
+    '</div>';
+  $("#hhGo").onclick = gotoHomeSetting;
+  $("#hhClose").onclick = function(){ state.settings.homeHintDismissed = true; save(); renderHomeHint(); };
+}
+function gotoHomeSetting(){
+  switchTab("settings");
+  setTimeout(function(){
+    const inp = $("#set-homeq"); if(!inp) return;
+    inp.scrollIntoView({block:"center"});
+    try{ inp.focus({preventScroll:true}); }catch(e){ inp.focus(); }
+    const row = inp.closest(".row");
+    if(row){ row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
+  }, 130);
+}
+
+/* ---------- 新手教學 ---------- */
+const TOUR = [
+  { tab:"home", target:null, align:"center",
+    title:"歡迎來到「今天吃什麼」👋",
+    body:"每天為了吃什麼煩惱嗎？花一分鐘帶你逛一圈，之後就能天天一鍵決定。\n趕時間的話，右上角隨時可以「跳過」。",
+    next:"開始導覽" },
+  { tab:"stores", target:"#addStoreBtn", align:"center",
+    title:"第一步：把「會去吃的店」放進來",
+    body:"點右上角這顆「＋ 新增」就能加一間店。三個小提醒：\n・店名盡量打正確，自動功能和地圖才找得到它。\n・只加你「真的會去吃」的店——不然抽到一堆不想去的也是白抽。\n・分類和距離現在填、先空著都可以，之後能用自動功能補。",
+    next:"了解，下一步" },
+  { tab:"settings", target:"#onb-auto", align:"start",
+    title:"第二步：設定一次，之後超省事",
+    body:"這區最重要的是先設好「家的位置」（必填）——它是所有距離的基準點。\n設好之後，「一鍵自動算距離」和「一鍵自動分類」就會幫你把店家的距離、分類自動補好，不用一筆一筆慢慢打。",
+    next:"下一步" },
+  { tab:"home", target:"#decideBtn", align:"center",
+    title:"第三步：剩下的交給這顆按鈕",
+    body:"在這頁點今天的條件（點一下＝要、再點一下＝不要、不點＝不限），再按大大的「決定！」就會幫你抽一間。\n抽到不滿意？兩個人各有一次否決權可以換店；決定好就按「就吃這間」，自動帶你導航過去。",
+    next:"最後一步" },
+  { tab:"home", target:null, align:"center",
+    title:"完成！你已經學會了 🎉",
+    body:"現在這些是範例店家，給你參考用。想建立自己的清單，到「設定 → 清除所有資料」清空後，再照剛剛的方式加入你和家人的口袋名單就好。\n祝你們每一餐都不再煩惱！",
+    next:"開始使用" },
+];
+let tourIdx = 0;
+(function buildTour(){
+  const t = document.createElement("div");
+  t.id = "tour";
+  t.innerHTML =
+    '<div id="tourRing"></div>'+
+    '<div id="tourCard">'+
+      '<div class="tour-top"><span class="tour-step" id="tourStep"></span><button class="tour-skip" id="tourSkip">跳過教學</button></div>'+
+      '<div class="tour-title" id="tourTitle"></div>'+
+      '<div class="tour-body" id="tourBody"></div>'+
+      '<div class="tour-nav"><button class="tour-prev" id="tourPrev">上一步</button><button class="tour-next" id="tourNext">下一步</button></div>'+
+    '</div>';
+  document.body.appendChild(t);
+  t.querySelector("#tourSkip").onclick = function(){ endTour(); };
+  t.querySelector("#tourPrev").onclick = function(){ tourGo(tourIdx-1); };
+  t.querySelector("#tourNext").onclick = function(){ tourGo(tourIdx+1); };
+})();
+function startTour(){ $("#tour").classList.add("show"); document.body.style.overflow="hidden"; tourGo(0); }
+function endTour(){
+  $("#tour").classList.remove("show");
+  document.body.style.overflow="";
+  state.settings.onboarded = true; save();
+  switchTab("home");
+}
+function tourGo(i){
+  if(i<0) return;
+  if(i>=TOUR.length){ endTour(); return; }
+  tourIdx = i;
+  const step = TOUR[i];
+  switchTab(step.tab);
+  $("#tourStep").textContent = (i+1)+" / "+TOUR.length;
+  $("#tourTitle").textContent = step.title;
+  $("#tourBody").textContent = step.body;
+  $("#tourPrev").style.display = i===0 ? "none" : "";
+  $("#tourNext").textContent = step.next || "下一步";
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ positionTour(step); }); });
+}
+function positionTour(step){
+  const ring = $("#tourRing"), card = $("#tourCard");
+  const el = step.target ? document.querySelector(step.target) : null;
+  if(el){
+    ring.classList.remove("notarget");
+    el.scrollIntoView({block: step.align || "center"});
+    requestAnimationFrame(function(){
+      const r = el.getBoundingClientRect(), pad = 8;
+      ring.style.top = (r.top-pad)+"px";
+      ring.style.left = (r.left-pad)+"px";
+      ring.style.width = (r.width+pad*2)+"px";
+      ring.style.height = (r.height+pad*2)+"px";
+      card.style.transform = "none";
+      const gapBelow = window.innerHeight - (r.top+r.height) - 80;
+      const gapAbove = r.top - 80;
+      if(gapBelow >= gapAbove){
+        card.style.top = (r.top+r.height+14)+"px"; card.style.bottom = "auto";
+        card.style.maxHeight = Math.max(150, gapBelow-14)+"px";
+      } else {
+        card.style.bottom = (window.innerHeight - r.top + 14)+"px"; card.style.top = "auto";
+        card.style.maxHeight = Math.max(150, gapAbove-14)+"px";
+      }
+    });
+  } else {
+    ring.classList.add("notarget");
+    ring.style.top="-60px"; ring.style.left="-60px"; ring.style.width="0px"; ring.style.height="0px";
+    card.style.bottom="auto"; card.style.top="50%"; card.style.transform="translateY(-50%)"; card.style.maxHeight="74vh";
+  }
+}
+
 /* ---------- 啟動 ---------- */
 // 首次開啟自動帶入在地起始店家（嶺東／南屯）；清空資料後就不會再自動帶入
 if(localStorage.getItem(KEY)===null){
@@ -1154,6 +1318,7 @@ autoMeal();
 renderHome();
 renderStores();
 renderSettings();
+if(!state.settings.onboarded){ setTimeout(startTour, 450); }
 </script>
 </body>
 </html>
