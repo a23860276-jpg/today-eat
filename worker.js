@@ -39,11 +39,15 @@ async function geocode(body, env, cors) {
   if (typeof body.lat === "number" && typeof body.lng === "number") {
     gbody.locationBias = { circle: { center: { latitude: body.lat, longitude: body.lng }, radius: 25000 } };
   }
+  // 只有「設定家的位置」會要 addressComponents（拿縣市）；一般距離查詢不要，省費用
+  const fields = body.withArea
+    ? "places.location,places.displayName,places.addressComponents"
+    : "places.location,places.displayName";
   const ref = env.ALLOWED_ORIGIN ? env.ALLOWED_ORIGIN.replace(/\/+$/, "") + "/" : "";
   const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
     headers: Object.assign(
-      { "Content-Type": "application/json", "X-Goog-Api-Key": env.GOOGLE_KEY, "X-Goog-FieldMask": "places.location,places.displayName" },
+      { "Content-Type": "application/json", "X-Goog-Api-Key": env.GOOGLE_KEY, "X-Goog-FieldMask": fields },
       ref ? { "Referer": ref } : {}
     ),
     body: JSON.stringify(gbody),
@@ -53,7 +57,12 @@ async function geocode(body, env, cors) {
   const j = await r.json();
   const p = (j.places || [])[0];
   if (!p || !p.location) return json({ result: null }, 200, cors);
-  return json({ result: { lat: p.location.latitude, lng: p.location.longitude, name: (p.displayName && p.displayName.text) || q } }, 200, cors);
+  let area = "";
+  if (body.withArea && Array.isArray(p.addressComponents)) {
+    const ac = p.addressComponents.find((c) => (c.types || []).indexOf("administrative_area_level_1") >= 0);
+    if (ac) area = ac.longText || ac.shortText || "";
+  }
+  return json({ result: { lat: p.location.latitude, lng: p.location.longitude, name: (p.displayName && p.displayName.text) || q, area: area } }, 200, cors);
 }
 
 async function classify(body, env, cors) {
@@ -61,10 +70,14 @@ async function classify(body, env, cors) {
   const name = (body.name || "").toString().trim();
   if (!name) return json({ error: "empty" }, 400, cors);
   const note = (body.note || "").toString().trim();
+  const area = (body.area || "").toString().trim();
   const opt = body.options || {};
   const prompt = [
     "你是台灣餐飲分類助理。請『上網查證』這間餐廳的實際資訊（菜單、餐點類型、人均消費、營業時段）後再分類。",
-    '餐廳：「' + name + '」' + (note ? "（備註：" + note + "）" : "") + "，位於台灣台中。",
+    "餐廳：「" + name + "」" + (note ? "（備註：" + note + "）" : "") + "。",
+    area
+      ? "使用者住在台灣「" + area + "」。請『優先』找「" + area + "」境內的這家店；若該縣市查無此店，再找離「" + area + "」最近的分店（例如鄰近縣市），不要選到遠處的同名分店。請以那家分店的實際資訊為準。"
+      : "這家店在台灣，請以最相符的那家為準。",
     "只能從下列『允許值』中選，不可自創、不可翻譯：",
     "主食(可多選)：" + (opt.staple || []).join("、"),
     "菜系(可多選)：" + (opt.cuisine || []).join("、"),
@@ -79,7 +92,7 @@ async function classify(body, env, cors) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + env.OPENAI_KEY },
     // 若你的帳號回報 web_search 不支援，把 tools 的 type 改成 "web_search_preview"
-    body: JSON.stringify({ model: "gpt-4o-mini", tools: [{ type: "web_search" }], input: prompt }),
+    body: JSON.stringify({ model: "gpt-5-nano", tools: [{ type: "web_search" }], input: prompt }),
   });
   if (r.status === 401 || r.status === 403) return json({ error: "openai-auth", status: r.status }, r.status, cors);
   if (!r.ok) { const t = await r.text(); return json({ error: "openai", status: r.status, detail: t.slice(0, 300) }, 502, cors); }

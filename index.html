@@ -325,7 +325,7 @@ const DEFAULT_TAGS = {
   price:["100以內","100~200","200~300","300~500","500以上"],
 };
 const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
-const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249};
+const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
     log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"太太", googleKey:"", home:Object.assign({},DEFAULT_HOME)}};
@@ -375,7 +375,7 @@ function normalize(d){
   out.settings.excludeDisliked = !!out.settings.excludeDisliked;
   out.settings.user1 = String(out.settings.user1||"").trim().slice(0,12) || "我";
   out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "太太";
-  var _h = d.settings && d.settings.home; out.settings.home = (_h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||DEFAULT_HOME.label), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng)} : Object.assign({},DEFAULT_HOME);
+  var _h = d.settings && d.settings.home; out.settings.home = (_h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||DEFAULT_HOME.label), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng), area:String(_h.area||"")||DEFAULT_HOME.area} : Object.assign({},DEFAULT_HOME);
   out.settings.googleKey = String(out.settings.googleKey||"");
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
@@ -927,16 +927,17 @@ function loadSamples(){
 /* ---------- 距離（Google Places API New 取座標 → 只存級距、不存座標；之後可換 OSRM 精確版） ---------- */
 function proxyReady(){ return !!DISTANCE_PROXY && DISTANCE_PROXY.indexOf("YOUR-WORKER")<0; }
 // 透過你的 Cloudflare Worker 代理查座標（Google 金鑰藏在 Worker 後端，不在前端）
-async function googleGeocode(query, bias){
+async function googleGeocode(query, bias, withArea){
   if(!proxyReady()) throw {code:"NOPROXY"};
   const body = { q: query };
   if(bias && bias.lat!=null){ body.lat=bias.lat; body.lng=bias.lng; }
+  if(withArea) body.withArea = true;
   const r = await fetch(DISTANCE_PROXY, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   if(r.status===401 || r.status===403) throw {code:"AUTH", status:r.status};
   if(!r.ok) throw {code:"HTTP", status:r.status};
   const j = await r.json();
   if(!j || !j.result) return null;
-  return { lat:j.result.lat, lng:j.result.lng, name:j.result.name||query };
+  return { lat:j.result.lat, lng:j.result.lng, name:j.result.name||query, area:j.result.area||"" };
 }
 function haversineKm(aLat,aLng,bLat,bLng){
   const R=6371, t=Math.PI/180;
@@ -973,9 +974,9 @@ async function setHomeFromInput(){
   if(!proxyReady()){ alert("距離服務尚未設定：請把你的 Cloudflare Worker 網址填到 index.html 最上面的 DISTANCE_PROXY。"); return; }
   const btn=$("#btn-homeset"); if(btn){ btn.disabled=true; btn.textContent="查詢中…"; }
   try{
-    const g = await googleGeocode(q, state.settings.home);
+    const g = await googleGeocode(q, state.settings.home, true);
     if(!g){ alert("查不到這個地點，換個地標或地址再試。"); return; }
-    state.settings.home = {label:(g.name||q), lat:g.lat, lng:g.lng};
+    state.settings.home = {label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""};
     save(); renderSettings(); toast("已設定家的位置");
   }catch(e){ alert(e&&e.code==="NOPROXY" ? "距離服務尚未設定（DISTANCE_PROXY）。" : authHint(e)); }
   finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="查詢"; } }
@@ -1023,7 +1024,7 @@ async function requireUnlock(feature){
 // 透過 Worker 呼叫 AI（OpenAI + web search），回傳合法標籤；座標/原始資料都不存
 async function aiClassify(name, note){
   if(!proxyReady()) throw {code:"NOPROXY"};
-  const body = { op:"classify", name:name, note:note||"",
+  const body = { op:"classify", name:name, note:note||"", area:(state.settings.home && state.settings.home.area)||"",
     options:{ staple:state.tagOptions.staple, cuisine:state.tagOptions.cuisine, meals:state.tagOptions.meals, price:state.tagOptions.price } };
   const r = await fetch(DISTANCE_PROXY, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   if(r.status===401 || r.status===403) throw {code:"AUTH", status:r.status};
