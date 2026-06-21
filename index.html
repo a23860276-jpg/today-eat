@@ -402,7 +402,7 @@ const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -454,6 +454,7 @@ function normalize(d){
   out.settings.homeSet = !!out.settings.homeSet;
   out.settings.homeHintDismissed = !!out.settings.homeHintDismissed;
   out.settings.drawIntroSeen = !!out.settings.drawIntroSeen;
+  out.settings.chainNearest = out.settings.chainNearest!==false;
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
 }
@@ -556,9 +557,32 @@ function renderFilters(){
   }
   $("#filters").innerHTML = html;
 }
+function lcpLen(a,b){ var i=0, m=Math.min(a.length,b.length); while(i<m && a[i]===b[i]) i++; return i; }
+function collapseChains(list){
+  // 同品牌連鎖（依店名開頭自動辨識）只留離家最近的一家
+  if(!state.settings.chainNearest || list.length<2) return list;
+  var order = state.tagOptions.distance;
+  var rank = function(s){ var i=order.indexOf(s.distance); return i<0 ? 99 : i; };
+  var nm = function(s){ return (s.name||"").trim().toLowerCase(); };
+  var n=list.length, parent=[];
+  for(var i=0;i<n;i++) parent[i]=i;
+  var find=function(x){ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  for(var i=0;i<n;i++) for(var j=i+1;j<n;j++){
+    if(lcpLen(nm(list[i]), nm(list[j]))>=3) parent[find(i)]=find(j);  // 開頭相同 ≥3 字 → 同品牌
+  }
+  var groups={}, out=[];
+  for(var i=0;i<n;i++){ var r=find(i); (groups[r]=groups[r]||[]).push(list[i]); }
+  for(var k in groups){
+    var g=groups[k], best=g[0];
+    for(var t=1;t<g.length;t++){ if(rank(g[t])<rank(best)) best=g[t]; }  // 留最近級距
+    out.push(best);
+  }
+  return out;
+}
 function currentCandidates(){
   let c = state.stores.filter(matchesFilters);
   if(state.settings.excludeDisliked) c = c.filter(s=> (s.votes||[]).indexOf("no")<0);
+  c = collapseChains(c);
   return c;
 }
 function updateCount(){
@@ -832,6 +856,7 @@ function renderSettings(){
       <div class="row"><div class="lbl">避開最近吃過的<small>抽選時自動跳過最近吃過的店</small></div><input type="checkbox" id="set-avoid" ${st.avoidRecent?"checked":""}></div>
       <div class="row"><div class="lbl">避開最近幾次<small>記住最近 N 次當作「最近吃過」</small></div>
         <div class="stepper"><button id="aw-minus">−</button><b id="aw-val">${st.avoidWindow}</b><button id="aw-plus">＋</button></div></div>
+      <div class="row"><div class="lbl">連鎖店只抽最近的<small>同品牌的分店，只留離家最近那家（依店名自動辨識）</small></div><input type="checkbox" id="set-chain" ${st.chainNearest?"checked":""}></div>
       <div class="row"><div class="lbl">抽選動畫<small>按「決定！」時的老虎機效果</small></div><input type="checkbox" id="set-anim" ${st.animation?"checked":""}></div>
       <div class="row"><div class="lbl">選定後開啟 Google 地圖<small>按「就吃這間」後自動帶你導航</small></div><input type="checkbox" id="set-maps" ${st.openMaps?"checked":""}></div>
     </div>
@@ -880,6 +905,7 @@ function renderSettings(){
     <div class="ver">吃這 · 共 ${state.stores.length} 間店家 · 資料存在本機瀏覽器</div>`;
 
   $("#set-avoid").onchange = e=>{ state.settings.avoidRecent=e.target.checked; save(); };
+  $("#set-chain").onchange = e=>{ state.settings.chainNearest=e.target.checked; save(); updateCount(); };
   $("#set-anim").onchange  = e=>{ state.settings.animation=e.target.checked; save(); };
   $("#set-maps").onchange  = e=>{ state.settings.openMaps=e.target.checked; save(); };
   $("#set-user1").onchange = e=>{ state.settings.user1=(e.target.value||"").trim().slice(0,8)||"我"; e.target.value=state.settings.user1; save(); };
