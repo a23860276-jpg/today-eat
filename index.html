@@ -887,7 +887,7 @@ function renderSettings(){
       <div class="row"><div class="lbl">匯出 JSON<small>下載一份備份檔</small></div><button class="btn ghost" id="btn-export">匯出</button></div>
       <div class="row"><div class="lbl">匯入 JSON<small>從備份檔還原（會覆蓋現有資料）</small></div><button class="btn ghost" id="btn-import">匯入</button></div>
       <div class="row"><div class="lbl">合併匯入店家<small>加入清單檔的店家，不覆蓋現有資料（重複店名自動略過）</small></div><button class="btn ghost" id="btn-merge">合併</button></div>
-      <div class="row"><div class="lbl">重新帶入在地起始店家<small>嶺東／南屯一帶人氣店家</small></div><button class="btn ghost" id="btn-sample">帶入</button></div>
+      <div class="row"><div class="lbl">重新帶入在地起始店家<small>台中彰化人氣店家，已有的會自動略過</small></div><button class="btn ghost" id="btn-sample">帶入</button></div>
       <div class="row"><div class="lbl" style="color:var(--exc)">清除所有資料<small>店家、設定、紀錄全部清空</small></div><button class="btn danger" id="btn-clear">清除</button></div>
     </div>
 
@@ -1027,14 +1027,117 @@ const SAMPLE = [
   {"name": "述憶灶咖 早午餐.私廚.外燴", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "早午餐、私廚外燴"},
   {"name": "順柔烏龍麵（うどん しなやか）飯類／烏冬", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "烏龍麵、飯類"},
   {"name": "泰辣小吃（泰式料理）", "staple": ["飯", "麵"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "泰式料理"},
-  {"name": "蒸旺手工小籠湯包", "staple": ["麵食", "麵"], "cuisine": ["中式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "100以內", "note": "小籠湯包，晚上營業到售完"}
+  {"name": "蒸旺手工小籠湯包", "staple": ["麵食", "麵"], "cuisine": ["中式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "100以內", "note": "小籠湯包，晚上營業到售完"},
+  {"name": "牛谷牛肉麵水餃滷味丼飯", "staple": ["麵", "飯", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "紅燒牛肉麵、丼飯、水餃；湯可續"},
+  {"name": "玉膳堂牛肉麵·手工水餃", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "刀切牛肉麵、韭菜水餃"},
+  {"name": "上泓園川燙牛肉麵", "staple": ["麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "清燙牛肉麵、現切牛肉"},
+  {"name": "有沒有牛肉麵 台中西屯店", "staple": ["麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "紅燒／川味牛肉麵"},
+  {"name": "林立牛肉麵", "staple": ["麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "清燉牛肉麵"},
+  {"name": "佐原拉麵", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "豚骨／魚介拉麵、可樂餅"},
+  {"name": "長生鹽人 台中", "staple": ["麵"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "200~300", "note": "鹽味雞白湯拉麵"},
+  {"name": "拉麵商店", "staple": ["麵"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "100~200", "note": "平價拉麵"},
+  {"name": "渡山樓", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "味噌／豚骨拉麵"},
+  {"name": "ajussi 阿啾西拉麵圖書館 文化店", "staple": ["麵"], "cuisine": ["日式"], "meals": ["早餐", "午餐", "晚餐", "宵夜"], "distance": "", "price": "100~200", "note": "24小時拉麵、深夜食堂"},
+  {"name": "MEN EIJI 北海道鴨白湯拉麵 勤美店", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "鴨白湯拉麵（米其林必比登）"},
+  {"name": "麵屋一燈 勤美店", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "200~300", "note": "沾麵、拉麵"},
+  {"name": "Top One Pot 朝富店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "精緻個人鍋／雙人套餐"},
+  {"name": "青花驕 台中公益店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "麻辣鍋"},
+  {"name": "岩漾漢方麻辣火鍋 公益店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "漢方麻辣火鍋"},
+  {"name": "湯棧 中清店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "個人鍋、台式湯底"},
+  {"name": "萬客什鍋 青海店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "石頭涮涮鍋、冰淇淋吃到飽"},
+  {"name": "老井極上燒肉 福科店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "和牛燒肉、龍蝦鍋飯"},
+  {"name": "Mori Mori 燒肉", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "燒肉"},
+  {"name": "Power of Meat 文心崇德店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "燒肉＋海鮮吃到飽（約NT$660）"},
+  {"name": "森森燒肉 台中站前秀泰店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": "燒肉＋甜點吃到飽"},
+  {"name": "月見里山 炭火燒肉", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "和牛炭火燒肉、單點"},
+  {"name": "燒肉ショジョ SHOJO 公益店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "高級和牛燒肉"},
+  {"name": "札卡燒肉 漢口店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "輸送帶燒肉"},
+  {"name": "一本釣 職人燒肉", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": "職人燒肉"},
+  {"name": "千汌 にほんりょうり", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "日式定食、套餐、握壽司"},
+  {"name": "隱居いざかや 台中店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "居酒屋、烤物、鮭魚炒飯"},
+  {"name": "羽笠食事日式料理", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "居酒屋／丼飯、海膽丼"},
+  {"name": "燖川和食", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "生魚片、丼飯（高CP）"},
+  {"name": "泰壽司 西屯", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "壽司、烏龍麵、生魚片"},
+  {"name": "鮨本道日本料理", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "板前握壽司、套餐（評論數少，參考性中等）"},
+  {"name": "禾山日本料理", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "海鮮丼、山藥麵、烤魚（評論數少，參考性中等）"},
+  {"name": "小小麥 鮨遇", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "居酒屋、烏龍麵、串炸、握壽司"},
+  {"name": "貳食尋夢所", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "200~300", "note": "早午餐／bistro"},
+  {"name": "Piano Brunch 彼耶諾早午餐", "staple": ["麵食", "麵", "飯"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "200~300", "note": "可頌、義大利麵、燉飯、雞肉飯"},
+  {"name": "找伍食 FindFifth", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "200~300", "note": "早午餐餐盤（牛／魚／雞）"},
+  {"name": "mellow yellow 早午餐", "staple": ["飯", "麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "300~500", "note": "燉飯、牛頰、三明治（人均約300–500）"},
+  {"name": "晨光手作料理坊早午餐", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "200~300", "note": "手作早午餐"},
+  {"name": "L'USiNE Café", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "200~300", "note": "咖啡、三明治、西式早餐"},
+  {"name": "早午山 Brunch.Hill", "staple": ["麵食", "飯"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "300~500", "note": "捲餅、咖哩飯、沙拉（NT$278–340；評論數少）"},
+  {"name": "默金 Pasta 義大利麵", "staple": ["麵"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "松露奶油義大利麵"},
+  {"name": "曼蒂在家義大利麵", "staple": ["麵", "麵食"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "義大利麵、披薩"},
+  {"name": "Addiction", "staple": ["麵", "飯"], "cuisine": ["西式"], "meals": ["午餐"], "distance": "", "price": "300~500", "note": "義大利麵、海鮮燉飯"},
+  {"name": "Figarden", "staple": ["麵", "飯"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "義大利麵、燉飯"},
+  {"name": "米拉義式餐廳 學士路食常店", "staple": ["麵"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "義大利麵、法國麵包"},
+  {"name": "Pasta LAbbito", "staple": ["麵"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "和風義大利麵（日籍主廚）"},
+  {"name": "hun", "staple": ["麵", "麵食"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "義大利麵、起司餐包套餐"},
+  {"name": "八又三分之一", "staple": ["麵"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "義大利麵、歐風料理、無服務費"},
+  {"name": "吃。東西", "staple": ["麵", "麵食"], "cuisine": ["西式"], "meals": ["午餐"], "distance": "", "price": "300~500", "note": "義式融合、海鮮麵、千層麵、披薩"},
+  {"name": "橙 義大利麵", "staple": ["麵"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "義大利麵"},
+  {"name": "Kim", "staple": ["飯", "麵"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "韓式炸雞、烤肉、雞湯"},
+  {"name": "韓嗑 韓式料理 公益店", "staple": ["飯", "麵"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "韓式料理、牛肉湯"},
+  {"name": "可莉達 Kelimda 韓式料理", "staple": ["飯"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "韓式烤肉套餐"},
+  {"name": "Korea Town Restaurant 韓式", "staple": ["飯"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "韓式烤肉、石鍋拌飯、炸雞（每道約300–400）"},
+  {"name": "推擠 韓食", "staple": ["飯"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "韓式料理、小菜"},
+  {"name": "摸摸韓食堂 台中一中店", "staple": ["飯"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "韓式飯捲、海苔飯捲"},
+  {"name": "KATZ 卡司韓藝料理", "staple": ["飯", "鍋物"], "cuisine": ["韓式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "韓式炸雞、石鍋拌飯、嫩豆腐鍋"},
+  {"name": "大肉高手 爌肉飯", "staple": ["飯", "麵"], "cuisine": ["中式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "100~200", "note": "爌肉飯、麵"},
+  {"name": "945香 古早味排肉飯麵", "staple": ["飯", "麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "排肉飯、雞腿飯（排肉飯$120；評論數少）"},
+  {"name": "奇香小吃", "staple": ["麵", "飯", "麵食"], "cuisine": ["中式"], "meals": ["午餐"], "distance": "", "price": "100~200", "note": "牛肉麵、麻醬麵、魯肉飯、餛飩（評論數少）"},
+  {"name": "粧餅商行", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "古早味冷盤、蔥油餅、牛肉捲餅、綠豆煎餅"},
+  {"name": "宵夜場 幸福小館", "staple": ["飯", "麵", "麵食"], "cuisine": ["中式"], "meals": ["宵夜"], "distance": "", "price": "100~200", "note": "蛋餅、牛腩飯、炒泡麵（評論數少，參考性較低）"},
+  {"name": "燒瓶子。大肆の鍋 彰化店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "個人鍋、自選食材、泰式／牛奶鍋"},
+  {"name": "嗑肉石鍋 彰化四維店（二代店）", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "石頭火鍋"},
+  {"name": "這一小鍋 彰化旭光店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "個人小火鍋"},
+  {"name": "養鍋 Yang Guo 石頭涮涮鍋 彰化旗艦店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "石頭涮涮鍋、附飲料冰淇淋"},
+  {"name": "火鍋世家 彰化尊爵店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": "個人鍋、龍蝦／和牛（約NT$600–700）"},
+  {"name": "得魚食堂", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "生魚片、丼飯、定食"},
+  {"name": "好食日和洋小料理", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "日式定食、唐揚雞、味噌湯吃到飽（評論數少）"},
+  {"name": "Asada Japanese house", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "日式定食、洋食"},
+  {"name": "炎壽司", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "壽司、生魚片、丼飯、烏龍麵（評論數少）"},
+  {"name": "富森館台日料理 員林旗艦店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "生魚片、烤物、手捲、炭烤牛肋"},
+  {"name": "老六麵館", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100以內", "note": "麵、餛飩、水餃、酸辣湯（貢丸湯$25）"},
+  {"name": "伍藏（小叔）牛肉麵", "staple": ["麵", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "牛肉麵、醬油雞湯拉麵、雞肉麵（評論數少）"},
+  {"name": "甘老味幸福牛肉麵", "staple": ["麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "牛肉麵、雞湯麵、免費油條"},
+  {"name": "皇品牛肉麵 彰美店", "staple": ["麵", "麵食", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "牛肉麵、手工水餃、魯肉飯"},
+  {"name": "Butter 巴特手作晨食 彰化店", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "手作蛋餅、晨食"},
+  {"name": "土木公社炭烤土司 彰化店", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "碳烤吐司、蛋餅、總匯三明治、歐姆蛋"},
+  {"name": "途生 Tosstoss", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "300~500", "note": "班尼迪克蛋、歐式三明治、馬芬堡"},
+  {"name": "城中街一號 咖啡簡餐藝文空間", "staple": ["飯", "麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐"], "distance": "", "price": "200~300", "note": "咖啡簡餐（附飯／麵包）、鬆餅"},
+  {"name": "早餐櫃早午餐 彰化中山店", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "早午餐、簡餐"},
+  {"name": "丹雲小館 中式小炒", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "精緻中式小炒、合菜（僅接受多人合菜）"},
+  {"name": "八棧食堂", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "200~300", "note": "台式料理、雞湯"},
+  {"name": "員林爌肉羲", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "爌肉飯、便當、湯品"},
+  {"name": "莊手工鮮肉湯包", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "手工湯包（絲瓜蝦仁小籠包）"},
+  {"name": "天利食堂 彰化中正店", "staple": ["麵", "飯", "鍋物"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "丼飯、定食、絹豆腐鍋、烤咖哩、細麵"},
+  {"name": "秋本家", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "日式丼飯、拉麵、定食、炸豬排"},
+  {"name": "鹽岸 島嶼的義法料理", "staple": ["麵"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "義法料理、義大利麵、甜點"},
+  {"name": "食遇 SHI YU", "staple": ["麵", "飯"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "義大利麵、燉飯、焗烤、早午餐（評論數少，參考性中等）"},
+  {"name": "為食貓香港茶餐廳 員林", "staple": ["飯", "麵", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "港式茶餐廳、燒味飯、炒河粉、西多士"},
+  {"name": "ATTIC", "staple": ["麵食"], "cuisine": ["西式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "", "price": "300~500", "note": "全日餐廳、骰子牛、披薩"},
+  {"name": "海總派對 員林旗艦店（海鮮）", "staple": ["其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "海鮮餐廳、合菜"},
+  {"name": "長生鹽人 員林", "staple": ["麵"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "200~300", "note": "鹽味雞白湯拉麵"},
+  {"name": "同拉麵 員林店", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "200~300", "note": "拉麵、炸豬排、唐揚雞"},
+  {"name": "天利食堂 員林萬年店", "staple": ["麵", "飯", "鍋物"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "丼飯、定食、絹豆腐鍋、烤咖哩、細麵"},
+  {"name": "食添飯中式餐廳 員林", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "中式合菜、套餐、川味料理（評論數少，參考性中等）"},
+  {"name": "雲河星空景觀餐廳", "staple": [], "cuisine": ["其他"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "山景星空景觀餐廳，入場費NT$300含抵$100；菜系不明"},
+  {"name": "鹿港圓環頂麵食館", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "乾麵、陽春麵、餛飩、水餃、滷味（陽春麵$40/$80）"},
+  {"name": "禾火食堂（日式豬排）", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "日式豬排丼、定食、洋食"},
+  {"name": "品先蚵仔煎", "staple": ["其他", "飯"], "cuisine": ["中式"], "meals": ["午餐"], "distance": "", "price": "100~200", "note": "蚵仔煎、蚵仔粥、貢丸湯、綜合蛋"}
 ];
 function loadSamples(){
-  if(state.stores.length>0 && !confirm("會在現有店家後面加入 "+SAMPLE.length+" 間在地起始店家，確定嗎？")) return;
-  SAMPLE.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
+  const have = new Set(state.stores.map(s=>s.name));
+  const toAdd = SAMPLE.filter(s=> !have.has(s.name));
+  if(toAdd.length===0){ toast("起始店家都已經在清單裡了 🙂"); return; }
+  if(state.stores.length>0 && !confirm("會加入 "+toAdd.length+" 間還沒有的起始店家（重複的自動略過），確定嗎？")) return;
+  toAdd.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
   save();
   renderStores();
-  toast("已加入 "+SAMPLE.length+" 間在地起始店家");
+  toast("已加入 "+toAdd.length+" 間起始店家");
   switchTab("stores");
 }
 
