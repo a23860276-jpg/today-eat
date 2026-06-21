@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="今天吃什麼">
 <title>今天吃什麼？</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%226%22 fill=%22%23FF5630%22/><path d=%22M5 11.5h14a7 7 0 0 1-14 0Z%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%221.7%22 stroke-linejoin=%22round%22/><path d=%22M13 4 9 9%22 stroke=%22%23fff%22 stroke-width=%221.7%22 stroke-linecap=%22round%22/><path d=%22M15.6 5 11.6 9%22 stroke=%22%23fff%22 stroke-width=%221.7%22 stroke-linecap=%22round%22/></svg>">
 <style>
   :root{
     --bg:#f5f3f0; --card:#ffffff; --text:#191c20; --muted:#8b9099; --line:#ece8e2;
@@ -60,7 +60,7 @@
     -webkit-backdrop-filter:saturate(180%) blur(18px); border-bottom:1px solid var(--glass-bd);
   }
   header.app .logo{ width:38px; height:38px; border-radius:12px; background:var(--grad);
-    display:flex; align-items:center; justify-content:center; font-size:20px; flex:0 0 auto; box-shadow:var(--glow);}
+    display:flex; align-items:center; justify-content:center; font-size:20px; flex:0 0 auto;}
   header.app .brandtext{display:flex; flex-direction:column; line-height:1.18;}
   header.app h1{font-size:18px; margin:0; font-weight:800; letter-spacing:.2px;}
   header.app .sub{font-size:11.5px; color:var(--muted); margin:0;}
@@ -83,6 +83,11 @@
     cursor:pointer; font-family:inherit; transition:color .2s;
   }
   nav.tabbar button .ic{font-size:22px; line-height:1; transition:transform .2s;}
+  nav.tabbar button .ic svg{width:25px; height:25px; display:block;}
+  header.app .logo svg{width:23px; height:23px; display:block;}
+  .switchrow .tgl-ic{width:17px; height:17px; vertical-align:-3px; opacity:.8;}
+  .bic{width:16px; height:16px; vertical-align:-3px;}
+  .empty .big svg{width:46px; height:46px; display:block; margin:2px auto; opacity:.85;}
   nav.tabbar button.active{color:var(--brand); font-weight:700;}
   nav.tabbar button.active .ic{transform:translateY(-1px) scale(1.06);}
   nav.tabbar button.active::before{content:""; position:absolute; top:0; width:26px; height:3px; border-radius:0 0 3px 3px; background:var(--grad);}
@@ -237,7 +242,7 @@
 <body class="tab-home">
 
 <header class="app">
-  <span class="logo">🍽️</span>
+  <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5h16a8 8 0 0 1-16 0Z"/><path d="M13 3 8.5 9.5"/><path d="M15.8 4.2 11.3 9.5"/></svg></span>
   <div class="brandtext"><h1>今天吃什麼</h1><span class="sub">幫你和家人快速決定</span></div>
 </header>
 
@@ -246,8 +251,8 @@
   <div class="hint">點一下＝<b class="t-inc">要</b>，再點一下＝<b class="t-exc">不要</b>，再點＝不限。沒選的就不限制。</div>
   <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
   <div id="filters"></div>
-  <label class="switchrow"><span>避開最近吃過的 🔁</span><input type="checkbox" id="avoidToggle"></label>
-  <label class="switchrow"><span>排除有人「不喜歡」的店 🙅</span><input type="checkbox" id="dislikeToggle"></label>
+  <label class="switchrow"><span>避開最近吃過的 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><input type="checkbox" id="avoidToggle"></label>
+  <label class="switchrow"><span>排除有人「不喜歡」的店 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg></span><input type="checkbox" id="dislikeToggle"></label>
 </section>
 
 <!-- 決定列（固定底部） -->
@@ -272,9 +277,9 @@
 
 <!-- 底部分頁 -->
 <nav class="tabbar">
-  <button data-tab="home" class="active"><span class="ic">🎯</span>決定</button>
-  <button data-tab="stores"><span class="ic">🏪</span>店家</button>
-  <button data-tab="settings"><span class="ic">⚙️</span>設定</button>
+  <button data-tab="home" class="active"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></span>決定</button>
+  <button data-tab="stores"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 20v-6h5v6"/></svg></span>店家</button>
+  <button data-tab="settings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>設定</button>
 </nav>
 
 <!-- 結果浮層 -->
@@ -535,7 +540,7 @@ function openResult(list, relaxed){
   vetoDisabled = [ !!vetoUsed[0] || noMore, !!vetoUsed[1] || noMore ];
   const vbtn = (i)=>{
     const used = !!vetoUsed[i];
-    const label = used ? esc(u[i])+"（已換過）" : "🙅 "+esc(u[i])+" 不喜歡";
+    const label = used ? esc(u[i])+"（已換過）" : "<svg class='bic' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 14V2'/><path d='M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z'/></svg> "+esc(u[i])+" 不喜歡";
     return `<button class="btn veto" id="veto${i}" ${vetoDisabled[i]?"disabled":""}>${label}</button>`;
   };
   const noMoreNote = (noMore && (!vetoUsed[0] || !vetoUsed[1]))
@@ -554,7 +559,7 @@ function openResult(list, relaxed){
     </div>
     <button class="btn primary" id="acceptBtn" style="width:100%; margin-top:10px; padding:16px; font-size:18px">就吃這間！</button>
     <div style="display:flex; gap:18px; justify-content:center; margin-top:12px">
-      <button class="linkbtn" id="mapBtn">🗺️ 看地圖</button>
+      <button class="linkbtn" id="mapBtn"><svg class='bic' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z'/><circle cx='12' cy='10' r='2.5'/></svg> 看地圖</button>
       <button class="linkbtn" id="resultClose">關閉</button>
     </div>`;
   $("#veto0").onclick = ()=> vetoPick(0);
@@ -636,8 +641,8 @@ function acceptPick(){
 }
 function openResultEmpty(kind){
   const msg = kind==="noStore"
-    ? {icon:"🏪", title:"還沒有任何店家", desc:"先到「店家」新增，或到「設定」帶入在地起始店家。", btn:"前往新增", act:()=>{closeResult(); switchTab("stores");}}
-    : {icon:"🤔", title:"沒有符合條件的店", desc:"要不要放寬一下條件？", btn:"清除全部條件", act:()=>{clearFilters(); renderHome(); closeResult(); toast("已清除條件");}};
+    ? {icon:"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='4' rx='1'/><path d='M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8'/><path d='M9.5 20v-6h5v6'/></svg>", title:"還沒有任何店家", desc:"先到「店家」新增，或到「設定」帶入在地起始店家。", btn:"前往新增", act:()=>{closeResult(); switchTab("stores");}}
+    : {icon:"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m20 20-3.2-3.2'/></svg>", title:"沒有符合條件的店", desc:"要不要放寬一下條件？", btn:"清除全部條件", act:()=>{clearFilters(); renderHome(); closeResult(); toast("已清除條件");}};
   $("#resultBody").innerHTML = `
     <div class="empty"><span class="big">${msg.icon}</span><b>${msg.title}</b><br>${msg.desc}</div>
     <div class="formbtns"><button class="btn ghost" id="resultClose">關閉</button><button class="btn primary" id="emptyAct">${msg.btn}</button></div>`;
@@ -657,7 +662,7 @@ function renderStores(){
   if(q) list = list.filter(s=> (s.name+" "+(s.cuisine||[]).join(" ")+" "+(s.staple||[]).join(" ")+" "+s.distance+" "+(s.note||"")).toLowerCase().includes(q));
   const wrap = $("#storeList");
   if(state.stores.length===0){
-    wrap.innerHTML = `<div class="empty"><span class="big">🏪</span>還沒有店家<br>點右上角「＋ 新增」，<br>或到「設定」帶入在地起始店家。</div>`;
+    wrap.innerHTML = `<div class="empty"><span class="big"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='4' rx='1'/><path d='M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8'/><path d='M9.5 20v-6h5v6'/></svg></span>還沒有店家<br>點右上角「＋ 新增」，<br>或到「設定」帶入在地起始店家。</div>`;
     return;
   }
   if(list.length===0){ wrap.innerHTML = `<div class="empty">找不到符合「${esc(q)}」的店家</div>`; return; }
@@ -758,9 +763,9 @@ function renderSettings(){
       <h2>自動填寫（需網路）</h2>
       <div class="row"><div class="lbl">家的位置<small>距離的基準點｜目前：${esc((st.home&&st.home.label)||"未設定")}</small></div></div>
       <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
-      <div class="row"><div class="lbl">一鍵自動算距離<small>用 Google 幫「還沒填距離」的店推算；只存級距、不存座標；查不到會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
-      <div class="row"><div class="lbl">一鍵自動分類（AI 判讀）<small>AI 上網查證，幫「還沒分類」的店填主食／菜系／餐別／價位（不含距離）；填完請檢查</small></div><button class="btn ghost" id="btn-autoclass">開始</button></div>
-      <div class="ver" style="text-align:left;margin:6px 2px 2px">距離與 AI 分類都透過你的代理（金鑰藏在後端）。導航 © Google。</div>
+      <div class="row"><div class="lbl">一鍵自動算距離<small>自動幫「還沒填距離」的店估算距離；找不到的會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
+      <div class="row"><div class="lbl">一鍵自動分類（AI 判讀）<small>自動幫「還沒分類」的店填主食／菜系／餐別／價位（不含距離）；填完建議檢查一下</small></div><button class="btn ghost" id="btn-autoclass">開始</button></div>
+      <div class="ver" style="text-align:left;margin:6px 2px 2px">距離與分類為自動估算，僅供參考。導航由 Google 地圖提供。</div>
     </div>
 
     <div class="sect">
@@ -965,31 +970,31 @@ async function distanceBucketFor(home, s){
 }
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
 function authHint(e){ return (e&&e.code==="AUTH")
-  ? "距離服務被拒（HTTP "+e.status+"）。請檢查你的 Worker（GOOGLE_KEY、ALLOWED_ORIGIN）以及 Google 端的計費／Places API (New)／配額。"
-  : "查詢失敗，請檢查網路或代理設定。"; }
+  ? "服務暫時無法使用，請稍後再試。"
+  : "連線失敗，請檢查網路後再試。"; }
 
 async function setHomeFromInput(){
   const q = ($("#set-homeq").value||"").trim();
   if(!q){ alert("請先輸入住家地址或附近地標。"); return; }
-  if(!proxyReady()){ alert("距離服務尚未設定：請把你的 Cloudflare Worker 網址填到 index.html 最上面的 DISTANCE_PROXY。"); return; }
+  if(!proxyReady()){ alert("此功能暫時無法使用，請稍後再試。"); return; }
   const btn=$("#btn-homeset"); if(btn){ btn.disabled=true; btn.textContent="查詢中…"; }
   try{
     const g = await googleGeocode(q, state.settings.home, true);
     if(!g){ alert("查不到這個地點，換個地標或地址再試。"); return; }
     state.settings.home = {label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""};
     save(); renderSettings(); toast("已設定家的位置");
-  }catch(e){ alert(e&&e.code==="NOPROXY" ? "距離服務尚未設定（DISTANCE_PROXY）。" : authHint(e)); }
+  }catch(e){ alert(e&&e.code==="NOPROXY" ? "此功能暫時無法使用。" : authHint(e)); }
   finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="查詢"; } }
 }
 
 async function autoFillDistances(){
   const home = state.settings.home;
   if(!home || home.lat==null){ alert("請先在上面設定『家的位置』。"); return; }
-  if(!proxyReady()){ alert("距離服務尚未設定：請把你的 Cloudflare Worker 網址填到 index.html 最上面的 DISTANCE_PROXY。"); return; }
+  if(!proxyReady()){ alert("此功能暫時無法使用，請稍後再試。"); return; }
   if(!(await requireUnlock("distance"))) return;
   const todo = state.stores.filter(function(s){ return !s.distance; });
   if(!todo.length){ alert("所有店家都已經有距離了 🙂"); return; }
-  if(!confirm("要用 Google 幫 "+todo.length+" 間「沒有距離」的店家自動推算嗎？\n（只會存「車程X分鐘內」級距，不保留座標）")) return;
+  if(!confirm("要自動幫 "+todo.length+" 間「沒有距離」的店家估算距離嗎？")) return;
   const btn=$("#btn-autodist"); if(btn) btn.disabled=true;
   let filled=0; const problems=[]; let aborted=null;
   for(let i=0;i<todo.length;i++){
@@ -1009,7 +1014,7 @@ async function autoFillDistances(){
   }
   save(); renderStores(); renderSettings(); if(currentTab==="home") renderHome();
   const b=$("#btn-autodist"); if(b){ b.disabled=false; b.textContent="開始"; }
-  if(aborted){ alert(aborted.code==="NOPROXY" ? "距離服務尚未設定（DISTANCE_PROXY）。" : authHint(aborted)); return; }
+  if(aborted){ alert("服務暫時無法使用，請稍後再試。"); return; }
   let msg="完成！已自動填上 "+filled+" 間的距離。";
   if(problems.length){ msg += "\n\n有 "+problems.length+" 間查不到、已略過（請手動設定距離）：\n" + problems.slice(0,20).join("、") + (problems.length>20?" …":""); }
   alert(msg);
@@ -1039,11 +1044,11 @@ async function aiClassify(name, note){
 
 // 一鍵自動分類：只處理「還沒分類」的店（主食/菜系/餐別都空白），只填空欄、不覆蓋
 async function autoClassify(){
-  if(!proxyReady()){ alert("AI 服務尚未設定（DISTANCE_PROXY 還沒填你的 Worker 網址）。"); return; }
+  if(!proxyReady()){ alert("此功能暫時無法使用，請稍後再試。"); return; }
   if(!(await requireUnlock("classify"))) return;
   const todo = state.stores.filter(function(s){ return (s.staple||[]).length===0 && (s.cuisine||[]).length===0 && (s.meals||[]).length===0; });
   if(!todo.length){ alert("沒有「還沒分類」的店家 🙂（只會處理主食/菜系/餐別都空白的店）"); return; }
-  if(!confirm("要用 AI 幫 "+todo.length+" 間「還沒分類」的店家上網查證、自動填標籤嗎？\n（會用到你的 OpenAI 額度；只填主食/菜系/餐別/價位，不含距離）")) return;
+  if(!confirm("要自動幫 "+todo.length+" 間「還沒分類」的店家填上標籤嗎？\n（自動判斷主食／菜系／餐別／價位，不含距離）")) return;
   const btn=$("#btn-autoclass"); if(btn) btn.disabled=true;
   let filled=0; const problems=[]; let aborted=null;
   for(let i=0;i<todo.length;i++){
@@ -1067,13 +1072,12 @@ async function autoClassify(){
   save(); renderStores(); renderSettings(); if(currentTab==="home") renderHome();
   const b=$("#btn-autoclass"); if(b){ b.disabled=false; b.textContent="開始"; }
   if(aborted){
-    alert(aborted.code==="AUTH" ? "AI 服務被拒（HTTP "+aborted.status+"）。請檢查 Worker 的 OPENAI_KEY 與 OpenAI 計費。"
-        : aborted.code==="NOAI" ? "Worker 還沒設定 OPENAI_KEY。" : "AI 服務尚未設定。");
+    alert("服務暫時無法使用，請稍後再試。");
     return;
   }
   let msg="完成！已幫 "+filled+" 間自動分類。";
-  if(problems.length){ msg += "\n\n有 "+problems.length+" 間 AI 不確定或查不到、已略過：\n"+problems.slice(0,20).join("、")+(problems.length>20?" …":""); }
-  msg += "\n\n⚠️ AI 是參考、可能有誤，請到「店家」逐一檢查（尤其價位）。";
+  if(problems.length){ msg += "\n\n有 "+problems.length+" 間找不到資料、已略過：\n"+problems.slice(0,20).join("、")+(problems.length>20?" …":""); }
+  msg += "\n\n（自動判斷僅供參考，建議到「店家」確認一下，尤其價位。）";
   alert(msg);
 }
 
