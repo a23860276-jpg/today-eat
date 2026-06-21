@@ -395,7 +395,7 @@ const DEFAULT_TAGS = {
   staple:["麵","飯","鍋物","麵食","其他"],
   cuisine:["中式","西式","日式","東南亞","韓式","其他"],
   meals:["早餐","午餐","晚餐","宵夜"],
-  distance:["步行可到","5分鐘內","10分鐘內","15分鐘內","20分鐘內","20~30分鐘","30分鐘以上"],
+  distance:["步行可到","5分鐘內","10分鐘內","15分鐘內","20分鐘內","30分鐘內","30分鐘以上"],
   price:["100以內","100~200","200~300","300~500","500以上"],
 };
 const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
@@ -416,7 +416,7 @@ function toArr(v){
 function toStr(v){ const x = Array.isArray(v) ? (v.length?v[0]:"") : (v==null?"":v); return String(x).trim(); }
 function numOrNull(v){ const n=parseFloat(v); return isFinite(n)? n : null; }
 function migrateDistance(v){
-  if(v==="車程20分鐘以上") return "20~30分鐘";
+  if(v==="車程20分鐘以上" || v==="20~30分鐘" || v==="車程20~30分鐘") return "30分鐘內";
   return (v && v.indexOf("車程")===0) ? v.slice(2) : v;
 }
 function normStore(s){
@@ -1169,7 +1169,7 @@ function haversineKm(aLat,aLng,bLat,bLng){
 }
 const WALK_KM = 0.5;
 const MIN_PER_KM = 2.8;
-const MIN_BUCKETS = [[5,"5分鐘內"],[10,"10分鐘內"],[15,"15分鐘內"],[20,"20分鐘內"],[30,"20~30分鐘"]];
+const MIN_BUCKETS = [[5,"5分鐘內"],[10,"10分鐘內"],[15,"15分鐘內"],[20,"20分鐘內"],[30,"30分鐘內"]];
 function minutesToBucket(min){ for(const b of MIN_BUCKETS){ if(min<=b[0]) return b[1]; } return "30分鐘以上"; }
 /* ★ 未來要換「精確車程」只改這個函式：改成 await 呼叫 OSRM / OpenRouteService 即可，其它都不用動 */
 async function estimateDriveMinutes(home, s){
