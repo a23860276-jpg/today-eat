@@ -262,11 +262,11 @@
   .tbub-row{ display:flex; }
   .tbub-row.r{ justify-content:flex-end; }
   .tbub{ max-width:80%; padding:8px 13px; border-radius:16px; font-size:14.5px; line-height:1.4;
-    opacity:0; transform:translateY(7px); animation:bubin .34s ease forwards; }
+    opacity:0; transform:translateY(7px); animation:bubin .45s ease forwards; }
   .tbub.l{ background:var(--line); color:var(--text); border-bottom-left-radius:5px; }
   .tbub.r{ background:var(--grad); color:#fff; border-bottom-right-radius:5px; }
   .tbub.big{ font-size:30px; padding:2px 8px; background:none; }
-  .tour-scene-cap{ margin-top:14px; font-size:14px; line-height:1.6; color:var(--text); opacity:.92; }
+  .tour-scene-cap{ margin-top:14px; font-size:14px; line-height:1.6; color:var(--text); opacity:0; transform:translateY(7px); animation:bubin .5s ease forwards; }
   @keyframes bubin{ to{ opacity:1; transform:none; } }
   .tour-nav{ display:flex; gap:10px; margin-top:16px; }
   .tour-prev{ background:none; border:1px solid var(--line); color:var(--muted); border-radius:12px; padding:11px 14px; font-size:14px; font-weight:600; cursor:pointer; }
@@ -286,6 +286,12 @@
   .hh-warn{ color:var(--brand); font-weight:600; }
   .row.flash{ animation:rowflash 1.6s ease; }
   @keyframes rowflash{ 0%,100%{ background:transparent; } 25%,60%{ background:rgba(255,122,69,.16); } }
+  .drawintro{ display:flex; gap:9px; align-items:flex-start; margin:0 0 14px;
+    background:linear-gradient(135deg, rgba(255,122,69,.13), rgba(255,86,48,.06));
+    border:1px solid rgba(255,122,69,.30); border-radius:14px; padding:11px 13px;
+    font-size:13.5px; line-height:1.6; color:var(--text); }
+  .drawintro b{ color:var(--brand); font-weight:700; }
+  .di-ic{ flex:0 0 auto; font-size:16px; line-height:1.5; }
 </style>
 </head>
 <body class="tab-home">
@@ -383,7 +389,7 @@ const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -434,6 +440,7 @@ function normalize(d){
   out.settings.googleKey = String(out.settings.googleKey||"");
   out.settings.homeSet = !!out.settings.homeSet;
   out.settings.homeHintDismissed = !!out.settings.homeHintDismissed;
+  out.settings.drawIntroSeen = !!out.settings.drawIntroSeen;
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
 }
@@ -598,6 +605,9 @@ function openResult(list, relaxed){
   };
   const noMoreNote = (noMore && (!vetoUsed[0] || !vetoUsed[1]))
     ? '<div class="relaxnote">沒有更多可以換的店了，就從這裡決定吧 🙂</div>' : '';
+  const showIntro = !state.settings.drawIntroSeen;
+  const intro = showIntro ? '<div class="drawintro"><span class="di-ic">💡</span><div>不滿意這間嗎？按「不喜歡」可以換一間——但<b>兩人各只有 1 次</b>。用完、或按下「就吃這間」就<b>定案</b>囉，才不會一直抽個沒完 😆</div></div>' : '';
+  if(showIntro){ state.settings.drawIntroSeen = true; save(); }
   $("#resultBody").innerHTML = `
     ${relaxed?'<div class="relaxnote">符合的店最近都吃過了，已暫時不避開最近紀錄 🙂</div>':''}
     ${noMoreNote}
@@ -606,6 +616,7 @@ function openResult(list, relaxed){
       <div id="r-name"${animate?' class="spin"':''}>${esc(pick.name)}</div>
       <div class="r-info" id="r-info"></div>
     </div>
+    ${intro}
     <div class="formbtns" style="margin-top:18px">
       ${vbtn(0)}
       ${vbtn(1)}
@@ -1284,9 +1295,9 @@ function endTour(){
 }
 function sceneHTML(step){
   var rows = step.scene.map(function(m,i){
-    return '<div class="tbub-row '+(m.s?"r":"l")+'"><div class="tbub '+(m.s?"r":"l")+(m.big?" big":"")+'" style="animation-delay:'+(i*0.3).toFixed(2)+'s">'+m.t+'</div></div>';
+    return '<div class="tbub-row '+(m.s?"r":"l")+'"><div class="tbub '+(m.s?"r":"l")+(m.big?" big":"")+'" style="animation-delay:'+(i*0.9).toFixed(2)+'s">'+m.t+'</div></div>';
   }).join("");
-  return '<div class="tour-scene">'+rows+'</div><div class="tour-scene-cap">'+step.caption+'</div>';
+  return '<div class="tour-scene">'+rows+'</div><div class="tour-scene-cap" style="animation-delay:'+((step.scene.length-1)*0.9+0.5).toFixed(2)+'s">'+step.caption+'</div>';
 }
 function tourGo(i){
   if(i<0) return;
