@@ -1024,7 +1024,8 @@ async function requireUnlock(feature){
 // 透過 Worker 呼叫 AI（OpenAI + web search），回傳合法標籤；座標/原始資料都不存
 async function aiClassify(name, note){
   if(!proxyReady()) throw {code:"NOPROXY"};
-  const body = { op:"classify", name:name, note:note||"", area:(state.settings.home && state.settings.home.area)||"",
+  const home = state.settings.home || {};
+  const body = { op:"classify", name:name, note:note||"", area:home.area||"", lat:home.lat, lng:home.lng,
     options:{ staple:state.tagOptions.staple, cuisine:state.tagOptions.cuisine, meals:state.tagOptions.meals, price:state.tagOptions.price } };
   const r = await fetch(DISTANCE_PROXY, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   if(r.status===401 || r.status===403) throw {code:"AUTH", status:r.status};
