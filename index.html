@@ -755,11 +755,12 @@ function renderSettings(){
     </div>
 
     <div class="sect">
-      <h2>距離設定</h2>
+      <h2>自動填寫（需網路）</h2>
       <div class="row"><div class="lbl">家的位置<small>距離的基準點｜目前：${esc((st.home&&st.home.label)||"未設定")}</small></div></div>
       <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
       <div class="row"><div class="lbl">一鍵自動算距離<small>用 Google 幫「還沒填距離」的店推算；只存級距、不存座標；查不到會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
-      <div class="ver" style="text-align:left;margin:6px 2px 2px">距離查詢透過你的代理（金鑰藏在後端、不在前端）。導航 © Google。</div>
+      <div class="row"><div class="lbl">一鍵自動分類（AI 判讀）<small>AI 上網查證，幫「還沒分類」的店填主食／菜系／餐別／價位（不含距離）；填完請檢查</small></div><button class="btn ghost" id="btn-autoclass">開始</button></div>
+      <div class="ver" style="text-align:left;margin:6px 2px 2px">距離與 AI 分類都透過你的代理（金鑰藏在後端）。導航 © Google。</div>
     </div>
 
     <div class="sect">
@@ -798,6 +799,7 @@ function renderSettings(){
   $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"太太"; e.target.value=state.settings.user2; save(); };
   if($("#btn-homeset")) $("#btn-homeset").onclick = setHomeFromInput;
   if($("#btn-autodist")) $("#btn-autodist").onclick = autoFillDistances;
+  if($("#btn-autoclass")) $("#btn-autoclass").onclick = autoClassify;
   $("#aw-minus").onclick = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow-1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
   $("#aw-plus").onclick  = ()=>{ state.settings.avoidWindow=clamp(state.settings.avoidWindow+1,1,20); save(); $("#aw-val").textContent=state.settings.avoidWindow; };
   $("#btn-export").onclick = exportData;
@@ -983,6 +985,7 @@ async function autoFillDistances(){
   const home = state.settings.home;
   if(!home || home.lat==null){ alert("請先在上面設定『家的位置』。"); return; }
   if(!proxyReady()){ alert("距離服務尚未設定：請把你的 Cloudflare Worker 網址填到 index.html 最上面的 DISTANCE_PROXY。"); return; }
+  if(!(await requireUnlock("distance"))) return;
   const todo = state.stores.filter(function(s){ return !s.distance; });
   if(!todo.length){ alert("所有店家都已經有距離了 🙂"); return; }
   if(!confirm("要用 Google 幫 "+todo.length+" 間「沒有距離」的店家自動推算嗎？\n（只會存「車程X分鐘內」級距，不保留座標）")) return;
@@ -1008,6 +1011,67 @@ async function autoFillDistances(){
   if(aborted){ alert(aborted.code==="NOPROXY" ? "距離服務尚未設定（DISTANCE_PROXY）。" : authHint(aborted)); return; }
   let msg="完成！已自動填上 "+filled+" 間的距離。";
   if(problems.length){ msg += "\n\n有 "+problems.length+" 間查不到、已略過（請手動設定距離）：\n" + problems.slice(0,20).join("、") + (problems.length>20?" …":""); }
+  alert(msg);
+}
+
+/* ★ 廣告／付費解鎖的掛鉤：兩個自動按鈕都會先過這裡。回傳 true=放行、false=擋下。
+   之後要放廣告就在這裡 showAd().then(()=>true)；要付費解鎖就檢查你的旗標 */
+async function requireUnlock(feature){
+  return true;
+}
+
+// 透過 Worker 呼叫 AI（OpenAI + web search），回傳合法標籤；座標/原始資料都不存
+async function aiClassify(name, note){
+  if(!proxyReady()) throw {code:"NOPROXY"};
+  const body = { op:"classify", name:name, note:note||"",
+    options:{ staple:state.tagOptions.staple, cuisine:state.tagOptions.cuisine, meals:state.tagOptions.meals, price:state.tagOptions.price } };
+  const r = await fetch(DISTANCE_PROXY, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  if(r.status===401 || r.status===403) throw {code:"AUTH", status:r.status};
+  if(r.status===500){ const t=await r.json().catch(()=>({})); if(t && t.error==="no-openai-key") throw {code:"NOAI"}; throw {code:"HTTP", status:500}; }
+  if(!r.ok) throw {code:"HTTP", status:r.status};
+  const j = await r.json();
+  if(!j || !j.result) return null;
+  const x=j.result;
+  return { staple:x.staple||[], cuisine:x.cuisine||[], meals:x.meals||[], price:x.price||"" };
+}
+
+// 一鍵自動分類：只處理「還沒分類」的店（主食/菜系/餐別都空白），只填空欄、不覆蓋
+async function autoClassify(){
+  if(!proxyReady()){ alert("AI 服務尚未設定（DISTANCE_PROXY 還沒填你的 Worker 網址）。"); return; }
+  if(!(await requireUnlock("classify"))) return;
+  const todo = state.stores.filter(function(s){ return (s.staple||[]).length===0 && (s.cuisine||[]).length===0 && (s.meals||[]).length===0; });
+  if(!todo.length){ alert("沒有「還沒分類」的店家 🙂（只會處理主食/菜系/餐別都空白的店）"); return; }
+  if(!confirm("要用 AI 幫 "+todo.length+" 間「還沒分類」的店家上網查證、自動填標籤嗎？\n（會用到你的 OpenAI 額度；只填主食/菜系/餐別/價位，不含距離）")) return;
+  const btn=$("#btn-autoclass"); if(btn) btn.disabled=true;
+  let filled=0; const problems=[]; let aborted=null;
+  for(let i=0;i<todo.length;i++){
+    const s=todo[i];
+    if(btn) btn.textContent="處理中… "+(i+1)+"/"+todo.length;
+    try{
+      const g = await aiClassify(s.name, s.note);
+      if(!g){ problems.push(s.name); continue; }
+      let any=false;
+      if((s.staple||[]).length===0 && g.staple.length){ s.staple=g.staple; any=true; }
+      if((s.cuisine||[]).length===0 && g.cuisine.length){ s.cuisine=g.cuisine; any=true; }
+      if((s.meals||[]).length===0 && g.meals.length){ s.meals=g.meals; any=true; }
+      if(!s.price && g.price){ s.price=g.price; any=true; }
+      if(any){ s.updatedAt=Date.now(); filled++; } else { problems.push(s.name); }
+    }catch(e){
+      if(e && (e.code==="AUTH"||e.code==="NOPROXY"||e.code==="NOAI")){ aborted=e; break; }
+      problems.push(s.name);
+    }
+    await sleep(200);
+  }
+  save(); renderStores(); renderSettings(); if(currentTab==="home") renderHome();
+  const b=$("#btn-autoclass"); if(b){ b.disabled=false; b.textContent="開始"; }
+  if(aborted){
+    alert(aborted.code==="AUTH" ? "AI 服務被拒（HTTP "+aborted.status+"）。請檢查 Worker 的 OPENAI_KEY 與 OpenAI 計費。"
+        : aborted.code==="NOAI" ? "Worker 還沒設定 OPENAI_KEY。" : "AI 服務尚未設定。");
+    return;
+  }
+  let msg="完成！已幫 "+filled+" 間自動分類。";
+  if(problems.length){ msg += "\n\n有 "+problems.length+" 間 AI 不確定或查不到、已略過：\n"+problems.slice(0,20).join("、")+(problems.length>20?" …":""); }
+  msg += "\n\n⚠️ AI 是參考、可能有誤，請到「店家」逐一檢查（尤其價位）。";
   alert(msg);
 }
 
