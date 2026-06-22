@@ -128,8 +128,8 @@
   .count.zero b{color:var(--exc);}
   .decide{ flex:1; border:none; border-radius:16px; cursor:pointer; font-family:inherit;
     background:var(--grad); color:#fff; font-size:20px; font-weight:800; padding:17px; letter-spacing:2px;
-    box-shadow:var(--glow); transition:transform .12s, box-shadow .2s;}
-  .decide:active{transform:scale(.975); box-shadow:0 6px 16px rgba(255,86,48,.32);}
+    box-shadow:0 4px 14px rgba(0,0,0,.14); transition:transform .12s, box-shadow .2s;}
+  .decide:active{transform:scale(.975); box-shadow:0 4px 12px rgba(0,0,0,.2);}
 
   /* hint + groups */
   .hint{font-size:13px; color:var(--muted); background:var(--card); border:1px solid var(--line);
@@ -337,9 +337,10 @@
   .rng::-webkit-slider-thumb:active{ transform:scale(1.12); box-shadow:0 0 0 2px var(--brand), 0 5px 14px rgba(0,0,0,.34); cursor:grabbing; }
   .rng::-moz-range-thumb{ pointer-events:auto; width:26px; height:26px; border-radius:50%; background:#fff; border:2.5px solid var(--brand); box-shadow:0 3px 9px rgba(0,0,0,.30); }
   .dual .rmin{ z-index:3; } .dual .rmax{ z-index:4; }
-  .slbubble{ position:absolute; bottom:calc(100% + 9px); left:0; transform:translateX(-50%); visibility:hidden;
+  .slbubble{ position:absolute; bottom:calc(100% + 9px); left:0; transform:translateX(-50%); opacity:0; visibility:hidden; transition:opacity .1s;
     background:var(--grad); color:#fff; font-size:12.5px; font-weight:800; letter-spacing:.02em; padding:4px 11px; border-radius:9px;
     white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.22); pointer-events:none; }
+  .slbubble.show{ opacity:1; visibility:visible; }
   .slbubble::after{ content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:-1px;
     border:6px solid transparent; border-top-color:#ff5236; }
   .segctl{ display:inline-flex; background:var(--chip); border:1px solid var(--line); border-radius:11px; padding:3px; gap:2px; flex:0 0 auto; }
@@ -606,7 +607,7 @@ function renderFilters(){
     }
     const chips = opts.map(o=>{
       const on = filters[cat.key][o]===1;
-      return `<button class="chip${on?" inc":""}" data-cat="${cat.key}" data-opt="${esc(o)}">${esc(o)}</button>`;
+      return `<button class="chip ${on?"inc":"exc"}" data-cat="${cat.key}" data-opt="${esc(o)}">${esc(o)}</button>`;
     }).join("");
     html += `<div class="fgroup"><div class="fglabel">${cat.label}</div><div class="chips">${chips}</div></div>`;
   }
@@ -660,7 +661,8 @@ function layoutTicks(el, n, w, lo, hi){
   }
   el.innerHTML=html;
 }
-function placeBubble(b, px, w){ b.style.left=Math.max(22,Math.min(w-22,px))+"px"; b.style.visibility="visible"; }
+let pressedThumb=null;
+function placeBubble(b, px, w){ b.style.left=Math.max(22,Math.min(w-22,px))+"px"; }
 function layoutDistance(){
   const inp=document.querySelector("#distSlider"); if(!inp) return;
   const w=inp.offsetWidth; if(!w) return;
@@ -675,7 +677,7 @@ function layoutPrice(){
   const opts=state.tagOptions.price, max=opts.length-1, lo=+mn.value, hi=+mx.value;
   const loPx=frac2px(lo/max,w), hiPx=frac2px(hi/max,w);
   const f=document.querySelector("#priceFill"); f.style.left=loPx+"px"; f.style.width=Math.max(0,hiPx-loPx)+"px";
-  const b=document.querySelector("#priceBub"); b.textContent=priceRangeLabel(opts,lo,hi); placeBubble(b,(loPx+hiPx)/2,w);
+  const b=document.querySelector("#priceBub"); b.textContent=priceRangeLabel(opts,lo,hi); placeBubble(b, pressedThumb==="max"?hiPx:pressedThumb==="min"?loPx:(loPx+hiPx)/2, w);
   layoutTicks(document.querySelector("#priceTicks"), max+1, w, lo, hi);
 }
 function layoutSliders(){ layoutDistance(); layoutPrice(); }
@@ -1461,9 +1463,13 @@ $("#filters").addEventListener("input", e=>{
   }
 });
 $("#filters").addEventListener("pointerdown", e=>{
-  if(e.target.id==="priceMin"){ e.target.style.zIndex=6; const o=$("#priceMax"); if(o) o.style.zIndex=5; }
-  else if(e.target.id==="priceMax"){ e.target.style.zIndex=6; const o=$("#priceMin"); if(o) o.style.zIndex=5; }
+  if(e.target.id==="distSlider"){ pressedThumb="dist"; const b=$("#distBubble"); if(b) b.classList.add("show"); layoutDistance(); }
+  else if(e.target.id==="priceMin"){ pressedThumb="min"; e.target.style.zIndex=6; const o=$("#priceMax"); if(o) o.style.zIndex=5; const b=$("#priceBub"); if(b) b.classList.add("show"); layoutPrice(); }
+  else if(e.target.id==="priceMax"){ pressedThumb="max"; e.target.style.zIndex=6; const o=$("#priceMin"); if(o) o.style.zIndex=5; const b=$("#priceBub"); if(b) b.classList.add("show"); layoutPrice(); }
 });
+function hideSlBubbles(){ pressedThumb=null; const a=$("#distBubble"), b=$("#priceBub"); if(a) a.classList.remove("show"); if(b) b.classList.remove("show"); }
+window.addEventListener("pointerup", hideSlBubbles);
+window.addEventListener("pointercancel", hideSlBubbles);
 $("#addStoreBtn").onclick = ()=> openForm(null);
 $("#storeSearch").addEventListener("input", renderStores);
 $("#storeList").addEventListener("click", e=>{
