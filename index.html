@@ -357,7 +357,7 @@
 <!-- 決定 -->
 <section id="view-home" class="view active">
   <div id="homeHint"></div>
-  <div class="hint">點一下＝<b class="t-inc">要</b>，再點一下＝<b class="t-exc">不要</b>，再點＝不限。沒選的就不限制。</div>
+  <div class="hint"><b class="t-inc">綠色＝要</b>、沒選＝不要。主食、菜系、餐別每類至少要選一個才抽得到。</div>
   <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
   <div id="filters"></div>
   <label class="switchrow"><span>避開最近吃過的 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><input type="checkbox" id="avoidToggle"></label>
@@ -538,17 +538,14 @@ function dateStr(){ const d=new Date(); const p=n=>String(n).padStart(2,"0"); re
 /* ---------- 篩選狀態（僅此次使用，不寫入儲存） ---------- */
 let filters = {staple:{},cuisine:{},meals:{},distance:{},price:null};
 function autoMeal(){
-  const h = new Date().getHours();
-  const m = (h>=5&&h<11)?"早餐":(h>=11&&h<17)?"午餐":(h>=17&&h<22)?"晚餐":"宵夜";
-  if(state.tagOptions.meals.includes(m)) filters.meals[m]=1;
+  const now=new Date(), t=now.getHours()*60+now.getMinutes();
+  const m = (t>=361&&t<=660)?"早餐":(t>=661&&t<=900)?"午餐":(t>=901&&t<=1260)?"晚餐":"宵夜"; // 早6:01-11:00 午-15:00 晚-21:00 宵夜其餘
+  if(state.tagOptions.meals.indexOf(m)>=0) filters.meals={[m]:1};
 }
-function cycleFilter(cat, opt){
-  const cur = filters[cat][opt];
-  const next = cur===1 ? -1 : cur===-1 ? 0 : 1;
-  if(next===0) delete filters[cat][opt]; else filters[cat][opt]=next;
-}
-function clearFilters(){ filters={staple:{},cuisine:{},meals:{},distance:{},price:null}; }
-function setSingleFilter(cat, opt){ filters[cat] = filters[cat][opt] ? {} : {[opt]:1}; }
+function toggleFilter(cat, opt){ if(filters[cat][opt]===1) delete filters[cat][opt]; else filters[cat][opt]=1; }
+function setMeal(opt){ filters.meals = {[opt]:1}; }
+function selectAllFilter(cat){ (state.tagOptions[cat]||[]).forEach(o=>filters[cat][o]=1); }
+function clearFilters(){ filters={staple:{},cuisine:{},meals:{},distance:{},price:null}; selectAllFilter("staple"); selectAllFilter("cuisine"); autoMeal(); }
 // 距離為「最遠可接受」門檻（單選），選 20 分鐘內＝包含步行/5/10/15 分鐘內
 function setDistanceThreshold(opt){ filters.distance = filters.distance[opt] ? {} : {[opt]:1}; }
 function matchesFilters(store){
@@ -570,12 +567,9 @@ function matchesFilters(store){
       }
       continue;
     }
-    const fmap = filters[cat.key]; const inc=[], exc=[];
-    for(const o in fmap){ if(fmap[o]===1) inc.push(o); else if(fmap[o]===-1) exc.push(o); }
-    if(!inc.length && !exc.length) continue;
-    const vals = cat.multi ? (store[cat.key]||[]) : (store[cat.key]? [store[cat.key]] : []);
-    if(inc.length && !vals.some(v=>inc.includes(v))) return false;
-    if(exc.length && vals.some(v=>exc.includes(v))) return false;
+    const sel = filters[cat.key];                 // 只有「要」(綠) 的值
+    const vals = store[cat.key]||[];
+    if(!vals.some(v=>sel[v]===1)) return false;    // 該類沒有任何「要」的值命中 → 排除
   }
   return true;
 }
@@ -605,16 +599,14 @@ function renderFilters(){
     if(cat.key==="meals"){
       const chips = opts.map(o=>{
         const on = filters.meals[o]===1;
-        return `<button class="chip${on?" inc":""}" data-cat="meals" data-opt="${esc(o)}" data-single="1">${on?"✓ ":""}${esc(o)}</button>`;
+        return `<button class="chip${on?" inc":""}" data-cat="meals" data-opt="${esc(o)}" data-single="1">${esc(o)}</button>`;
       }).join("");
       html += `<div class="fgroup"><div class="fglabel">${cat.label}</div><div class="chips">${chips}</div></div>`;
       continue;
     }
     const chips = opts.map(o=>{
-      const st = filters[cat.key][o];
-      const cls = st===1?"chip inc":st===-1?"chip exc":"chip";
-      const mark = st===1?"✓ ":st===-1?"✕ ":"";
-      return `<button class="${cls}" data-cat="${cat.key}" data-opt="${esc(o)}">${mark}${esc(o)}</button>`;
+      const on = filters[cat.key][o]===1;
+      return `<button class="chip${on?" inc":""}" data-cat="${cat.key}" data-opt="${esc(o)}">${esc(o)}</button>`;
     }).join("");
     html += `<div class="fgroup"><div class="fglabel">${cat.label}</div><div class="chips">${chips}</div></div>`;
   }
@@ -1450,8 +1442,8 @@ $("#avoidToggle").onchange = e=>{ state.settings.avoidRecent=e.target.checked; s
 $("#dislikeToggle").onchange = e=>{ state.settings.excludeDisliked=e.target.checked; save(); updateCount(); };
 $("#filters").addEventListener("click", e=>{
   const b = e.target.closest(".chip"); if(!b) return;
-  if(b.dataset.single) setSingleFilter(b.dataset.cat, b.dataset.opt);
-  else cycleFilter(b.dataset.cat, b.dataset.opt);
+  if(b.dataset.single) setMeal(b.dataset.opt);
+  else toggleFilter(b.dataset.cat, b.dataset.opt);
   renderFilters(); updateCount();
 });
 $("#filters").addEventListener("input", e=>{
@@ -1661,7 +1653,7 @@ if(localStorage.getItem(KEY)===null){
   save();
 }
 applyTheme();
-autoMeal();
+clearFilters();
 renderHome();
 renderStores();
 renderSettings();
