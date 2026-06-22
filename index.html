@@ -305,21 +305,31 @@
     font-size:13.5px; line-height:1.6; color:var(--text); }
   .drawintro b{ color:var(--brand); font-weight:700; }
   .di-ic{ flex:0 0 auto; font-size:16px; line-height:1.5; }
-  /* 篩選滑桿 */
-  .slbox{ padding:2px; }
-  .slval{ font-size:14px; font-weight:700; color:var(--brand); margin-bottom:9px; }
-  .slends{ display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:7px; }
-  .dslider{ -webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:5px; outline:none; cursor:pointer;
-    background:linear-gradient(to right, var(--brand) var(--p,100%), var(--line) var(--p,100%)); }
-  .dslider::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:#fff; border:2.5px solid var(--brand); box-shadow:0 2px 7px rgba(0,0,0,.25); cursor:pointer; }
-  .dslider::-moz-range-thumb{ width:24px; height:24px; border:2.5px solid var(--brand); border-radius:50%; background:#fff; }
-  .dualrange{ position:relative; height:30px; }
-  .dr-track{ position:absolute; top:50%; left:0; right:0; height:8px; transform:translateY(-50%); background:var(--line); border-radius:5px; }
-  .dr-fill{ position:absolute; top:50%; height:8px; transform:translateY(-50%); background:var(--grad); border-radius:5px; }
-  .dualrange .rng{ position:absolute; top:0; left:0; width:100%; height:30px; margin:0; -webkit-appearance:none; appearance:none; background:none; pointer-events:none; }
-  .dualrange .rng::-webkit-slider-thumb{ -webkit-appearance:none; pointer-events:auto; width:26px; height:26px; border-radius:50%; background:#fff; border:2.5px solid var(--brand); box-shadow:0 2px 7px rgba(0,0,0,.25); cursor:pointer; }
-  .dualrange .rng::-moz-range-thumb{ pointer-events:auto; width:24px; height:24px; border:2.5px solid var(--brand); border-radius:50%; background:#fff; }
-  .dualrange .rmin{ z-index:3; } .dualrange .rmax{ z-index:4; }
+  /* 篩選滑桿（質感版） */
+  .slbox{ padding:0 4px; }
+  .slends{ display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:11px; font-weight:600; }
+  .slwrap{ position:relative; height:40px; margin-top:26px; }
+  .sltrack{ position:absolute; top:50%; left:0; right:0; height:10px; transform:translateY(-50%); border-radius:6px;
+    background:var(--chip); box-shadow:inset 0 1px 3px rgba(0,0,0,.14), 0 1px 0 rgba(255,255,255,.55); }
+  .slfill{ position:absolute; top:0; bottom:0; left:0; width:0; border-radius:6px; background:var(--grad);
+    box-shadow:0 0 12px rgba(255,86,48,.55); transition:none; }
+  .slticks{ position:absolute; inset:0; pointer-events:none; }
+  .slt{ position:absolute; top:50%; width:4px; height:4px; border-radius:50%; transform:translate(-50%,-50%);
+    background:rgba(0,0,0,.16); transition:background .15s; }
+  .slt.on{ background:rgba(255,255,255,.92); box-shadow:0 0 3px rgba(255,255,255,.7); }
+  .rng{ position:absolute; top:0; left:0; width:100%; height:40px; margin:0; -webkit-appearance:none; appearance:none; background:none; pointer-events:none; }
+  .rng.solo{ pointer-events:auto; }
+  .rng::-webkit-slider-thumb{ -webkit-appearance:none; pointer-events:auto; width:28px; height:28px; border-radius:50%;
+    background:radial-gradient(circle at 50% 50%, var(--brand) 0 3px, #fff 4px);
+    box-shadow:0 0 0 2px var(--brand), 0 3px 9px rgba(0,0,0,.30); cursor:grab; transition:transform .12s, box-shadow .12s; }
+  .rng::-webkit-slider-thumb:active{ transform:scale(1.14); box-shadow:0 0 0 2px var(--brand), 0 0 0 9px rgba(255,86,48,.16), 0 6px 16px rgba(0,0,0,.36); cursor:grabbing; }
+  .rng::-moz-range-thumb{ pointer-events:auto; width:26px; height:26px; border-radius:50%; background:#fff; border:2.5px solid var(--brand); box-shadow:0 3px 9px rgba(0,0,0,.30); }
+  .dual .rmin{ z-index:3; } .dual .rmax{ z-index:4; }
+  .slbubble{ position:absolute; bottom:calc(100% + 9px); left:0; transform:translateX(-50%); visibility:hidden;
+    background:var(--grad); color:#fff; font-size:12.5px; font-weight:800; letter-spacing:.02em; padding:4px 11px; border-radius:9px;
+    white-space:nowrap; box-shadow:0 6px 16px rgba(255,86,48,.5); pointer-events:none; }
+  .slbubble::after{ content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:-1px;
+    border:6px solid transparent; border-top-color:#ff5236; }
 </style>
 </head>
 <body class="tab-home">
@@ -592,17 +602,18 @@ function renderFilters(){
     html += `<div class="fgroup"><div class="fglabel">${cat.label}</div><div class="chips">${chips}</div></div>`;
   }
   $("#filters").innerHTML = html;
+  requestAnimationFrame(layoutSliders);
 }
 function distanceSliderHTML(opts){
   const max = opts.length-1;
   const sel = Object.keys(filters.distance)[0];
   const idx = sel ? opts.indexOf(sel) : max;
-  const pct = max>0 ? Math.round(idx/max*100) : 100;
-  const val = idx>=max ? ("不限（"+esc(opts[max])+"）") : ("最遠 "+esc(opts[idx]));
-  return `<div class="fgroup"><div class="fglabel">車程距離 <span class="muted">（拖曳：最遠可接受）</span></div>
-    <div class="slbox"><div class="slval" id="distVal">${val}</div>
-      <input type="range" class="dslider" id="distSlider" min="0" max="${max}" step="1" value="${idx}" style="--p:${pct}%">
-      <div class="slends"><span>${esc(opts[0])}</span><span>${esc(opts[max])}</span></div></div></div>`;
+  return `<div class="fgroup"><div class="fglabel">車程距離 <span class="muted">（最遠可接受）</span></div>
+    <div class="slbox"><div class="slwrap">
+      <div class="sltrack"><div class="slfill" id="distFill"></div><div class="slticks" id="distTicks"></div></div>
+      <div class="slbubble" id="distBubble"></div>
+      <input type="range" class="rng solo" id="distSlider" min="0" max="${max}" step="1" value="${idx}">
+    </div><div class="slends"><span>${esc(opts[0])}</span><span>${esc(opts[max])}</span></div></div></div>`;
 }
 function priceBounds(label){
   var m;
@@ -622,16 +633,43 @@ function priceSliderHTML(opts){
   const max = opts.length-1;
   const lo = filters.price ? filters.price.lo : 0;
   const hi = filters.price ? filters.price.hi : max;
-  const loPct = lo/max*100, hiPct = hi/max*100;
-  return `<div class="fgroup"><div class="fglabel">價位 <span class="muted">（拖曳：選範圍）</span></div>
-    <div class="slbox"><div class="slval" id="priceVal">${priceRangeLabel(opts,lo,hi)}</div>
-      <div class="dualrange" id="priceDual"><div class="dr-track"></div>
-        <div class="dr-fill" id="priceFill" style="left:${loPct}%;width:${hiPct-loPct}%"></div>
-        <input type="range" class="rng rmin" id="priceMin" min="0" max="${max}" step="1" value="${lo}">
-        <input type="range" class="rng rmax" id="priceMax" min="0" max="${max}" step="1" value="${hi}">
-      </div>
-      <div class="slends"><span>${esc(opts[0])}</span><span>${esc(opts[max])}</span></div></div></div>`;
+  return `<div class="fgroup"><div class="fglabel">價位 <span class="muted">（選範圍）</span></div>
+    <div class="slbox"><div class="slwrap dual">
+      <div class="sltrack"><div class="slfill" id="priceFill"></div><div class="slticks" id="priceTicks"></div></div>
+      <div class="slbubble" id="priceBub"></div>
+      <input type="range" class="rng rmin" id="priceMin" min="0" max="${max}" step="1" value="${lo}">
+      <input type="range" class="rng rmax" id="priceMax" min="0" max="${max}" step="1" value="${hi}">
+    </div><div class="slends"><span>${esc(opts[0])}</span><span>${esc(opts[max])}</span></div></div></div>`;
 }
+const SL_THUMB = 28;
+function frac2px(frac, w){ return SL_THUMB/2 + frac*(w - SL_THUMB); }
+function layoutTicks(el, n, w, lo, hi){
+  let html="";
+  for(let i=0;i<n;i++){
+    const px=frac2px(n>1?i/(n-1):0, w);
+    html += `<i class="slt${(i>=lo&&i<=hi)?" on":""}" style="left:${px}px"></i>`;
+  }
+  el.innerHTML=html;
+}
+function placeBubble(b, px, w){ b.style.left=Math.max(22,Math.min(w-22,px))+"px"; b.style.visibility="visible"; }
+function layoutDistance(){
+  const inp=document.querySelector("#distSlider"); if(!inp) return;
+  const w=inp.offsetWidth; if(!w) return;
+  const opts=state.tagOptions.distance, max=opts.length-1, idx=+inp.value, px=frac2px(idx/max,w);
+  document.querySelector("#distFill").style.width=px+"px";
+  const b=document.querySelector("#distBubble"); b.textContent = idx>=max ? "不限" : opts[idx]; placeBubble(b,px,w);
+  layoutTicks(document.querySelector("#distTicks"), max+1, w, 0, idx);
+}
+function layoutPrice(){
+  const mn=document.querySelector("#priceMin"), mx=document.querySelector("#priceMax"); if(!mn) return;
+  const w=mn.offsetWidth; if(!w) return;
+  const opts=state.tagOptions.price, max=opts.length-1, lo=+mn.value, hi=+mx.value;
+  const loPx=frac2px(lo/max,w), hiPx=frac2px(hi/max,w);
+  const f=document.querySelector("#priceFill"); f.style.left=loPx+"px"; f.style.width=Math.max(0,hiPx-loPx)+"px";
+  const b=document.querySelector("#priceBub"); b.textContent=priceRangeLabel(opts,lo,hi); placeBubble(b,(loPx+hiPx)/2,w);
+  layoutTicks(document.querySelector("#priceTicks"), max+1, w, lo, hi);
+}
+function layoutSliders(){ layoutDistance(); layoutPrice(); }
 function lcpLen(a,b){ var i=0, m=Math.min(a.length,b.length); while(i<m && a[i]===b[i]) i++; return i; }
 function collapseChains(list){
   // 同品牌連鎖（依店名開頭自動辨識）只留離家最近的一家
@@ -1393,17 +1431,13 @@ $("#filters").addEventListener("input", e=>{
   if(t.id==="distSlider"){
     const opts=state.tagOptions.distance, max=opts.length-1, idx=+t.value;
     filters.distance = idx>=max ? {} : {[opts[idx]]:1};
-    t.style.setProperty("--p", Math.round(idx/max*100)+"%");
-    $("#distVal").innerHTML = idx>=max ? ("不限（"+esc(opts[max])+"）") : ("最遠 "+esc(opts[idx]));
-    updateCount();
+    layoutDistance(); updateCount();
   } else if(t.id==="priceMin" || t.id==="priceMax"){
     const opts=state.tagOptions.price, max=opts.length-1;
     let lo=+$("#priceMin").value, hi=+$("#priceMax").value;
     if(lo>hi){ if(t.id==="priceMin"){ hi=lo; $("#priceMax").value=hi; } else { lo=hi; $("#priceMin").value=lo; } }
     filters.price = (lo===0 && hi===max) ? null : {lo:lo, hi:hi};
-    const fill=$("#priceFill"); fill.style.left=(lo/max*100)+"%"; fill.style.width=((hi-lo)/max*100)+"%";
-    $("#priceVal").innerHTML = priceRangeLabel(opts, lo, hi);
-    updateCount();
+    layoutPrice(); updateCount();
   }
 });
 $("#filters").addEventListener("pointerdown", e=>{
