@@ -361,7 +361,6 @@
 <!-- 決定 -->
 <section id="view-home" class="view active">
   <div id="homeHint"></div>
-  <div class="hint"><b class="t-inc">綠色＝要</b>、沒選＝不要。主食、菜系、餐別每類至少要選一個才抽得到。</div>
   <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
   <div id="filters"></div>
   <label class="switchrow"><span>避開最近吃過的 <svg class="tgl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><input type="checkbox" id="avoidToggle"></label>
@@ -625,7 +624,7 @@ function distanceSliderHTML(opts){
     <div class="slbox"><div class="slwrap">
       <div class="sltrack"><div class="slfill" id="distFill"></div><div class="slticks" id="distTicks"></div></div>
       <div class="slbubble" id="distBubble"></div>
-      <input type="range" class="rng solo" id="distSlider" min="0" max="${max}" step="1" value="${idx}">
+      <input type="range" class="rng solo" id="distSlider" min="0" max="${max}" step="any" value="${idx}">
     </div><div class="slends"><span>${esc(opts[0])}</span><span>${esc(opts[max])}</span></div></div></div>`;
 }
 function priceBounds(label){
@@ -650,8 +649,8 @@ function priceSliderHTML(opts){
     <div class="slbox"><div class="slwrap dual">
       <div class="sltrack"><div class="slfill" id="priceFill"></div><div class="slticks" id="priceTicks"></div></div>
       <div class="slbubble" id="priceBub"></div>
-      <input type="range" class="rng rmin" id="priceMin" min="0" max="${max}" step="1" value="${lo}">
-      <input type="range" class="rng rmax" id="priceMax" min="0" max="${max}" step="1" value="${hi}">
+      <input type="range" class="rng rmin" id="priceMin" min="0" max="${max}" step="any" value="${lo}">
+      <input type="range" class="rng rmax" id="priceMax" min="0" max="${max}" step="any" value="${hi}">
     </div><div class="slends"><span>${esc(opts[0])}</span><span>${esc(opts[max])}</span></div></div></div>`;
 }
 const SL_THUMB = 28;
@@ -669,10 +668,10 @@ function placeBubble(b, px, w){ b.style.left=Math.max(22,Math.min(w-22,px))+"px"
 function layoutDistance(){
   const inp=document.querySelector("#distSlider"); if(!inp) return;
   const w=inp.offsetWidth; if(!w) return;
-  const opts=state.tagOptions.distance, max=opts.length-1, idx=+inp.value, px=frac2px(idx/max,w);
+  const opts=state.tagOptions.distance, max=opts.length-1, cv=+inp.value, idx=Math.round(cv), px=frac2px(cv/max,w);
   document.querySelector("#distFill").style.width=px+"px";
   const b=document.querySelector("#distBubble"); b.textContent = idx>=max ? "不限" : opts[idx]; placeBubble(b,px,w);
-  layoutTicks(document.querySelector("#distTicks"), max+1, w, 0, idx);
+  layoutTicks(document.querySelector("#distTicks"), max+1, w, 0, cv);
 }
 function layoutPrice(){
   const mn=document.querySelector("#priceMin"), mx=document.querySelector("#priceMax"); if(!mn) return;
@@ -680,7 +679,7 @@ function layoutPrice(){
   const opts=state.tagOptions.price, max=opts.length-1, lo=+mn.value, hi=+mx.value;
   const loPx=frac2px(lo/max,w), hiPx=frac2px(hi/max,w);
   const f=document.querySelector("#priceFill"); f.style.left=loPx+"px"; f.style.width=Math.max(0,hiPx-loPx)+"px";
-  const b=document.querySelector("#priceBub"); b.textContent=priceRangeLabel(opts,lo,hi); placeBubble(b, pressedThumb==="max"?hiPx:pressedThumb==="min"?loPx:(loPx+hiPx)/2, w);
+  const b=document.querySelector("#priceBub"); b.textContent=priceRangeLabel(opts,Math.round(lo),Math.round(hi)); placeBubble(b, pressedThumb==="max"?hiPx:pressedThumb==="min"?loPx:(loPx+hiPx)/2, w);
   layoutTicks(document.querySelector("#priceTicks"), max+1, w, lo, hi);
 }
 function layoutSliders(){ layoutDistance(); layoutPrice(); }
@@ -1454,14 +1453,15 @@ $("#filters").addEventListener("click", e=>{
 $("#filters").addEventListener("input", e=>{
   const t=e.target;
   if(t.id==="distSlider"){
-    const opts=state.tagOptions.distance, max=opts.length-1, idx=+t.value;
+    const opts=state.tagOptions.distance, max=opts.length-1, idx=Math.round(+t.value);
     filters.distance = idx>=max ? {} : {[opts[idx]]:1};
     layoutDistance(); updateCount();
   } else if(t.id==="priceMin" || t.id==="priceMax"){
     const opts=state.tagOptions.price, max=opts.length-1;
     let lo=+$("#priceMin").value, hi=+$("#priceMax").value;
     if(lo>hi){ if(t.id==="priceMin"){ hi=lo; $("#priceMax").value=hi; } else { lo=hi; $("#priceMin").value=lo; } }
-    filters.price = (lo===0 && hi===max) ? null : {lo:lo, hi:hi};
+    const rlo=Math.round(lo), rhi=Math.round(hi);
+    filters.price = (rlo===0 && rhi===max) ? null : {lo:rlo, hi:rhi};
     layoutPrice(); updateCount();
   }
 });
@@ -1470,7 +1470,16 @@ $("#filters").addEventListener("pointerdown", e=>{
   else if(e.target.id==="priceMin"){ pressedThumb="min"; e.target.style.zIndex=6; const o=$("#priceMax"); if(o) o.style.zIndex=5; const b=$("#priceBub"); if(b) b.classList.add("show"); layoutPrice(); }
   else if(e.target.id==="priceMax"){ pressedThumb="max"; e.target.style.zIndex=6; const o=$("#priceMin"); if(o) o.style.zIndex=5; const b=$("#priceBub"); if(b) b.classList.add("show"); layoutPrice(); }
 });
-function hideSlBubbles(){ pressedThumb=null; const a=$("#distBubble"), b=$("#priceBub"); if(a) a.classList.remove("show"); if(b) b.classList.remove("show"); }
+function hideSlBubbles(){
+  if(pressedThumb){
+    const d=$("#distSlider"); if(d) d.value=Math.round(+d.value);
+    const mn=$("#priceMin"); if(mn) mn.value=Math.round(+mn.value);
+    const mx=$("#priceMax"); if(mx) mx.value=Math.round(+mx.value);
+    layoutSliders();
+  }
+  pressedThumb=null;
+  const a=$("#distBubble"), b=$("#priceBub"); if(a) a.classList.remove("show"); if(b) b.classList.remove("show");
+}
 window.addEventListener("pointerup", hideSlBubbles);
 window.addEventListener("pointercancel", hideSlBubbles);
 $("#addStoreBtn").onclick = ()=> openForm(null);
