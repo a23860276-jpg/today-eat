@@ -430,7 +430,7 @@ const CATS = [
   {key:"staple",  label:"主食", multi:true},
   {key:"cuisine", label:"菜系", multi:true},
   {key:"meals",   label:"餐別", multi:true},
-  {key:"distance",label:"車程距離", multi:false},
+  {key:"distance",label:"車程", multi:false},
   {key:"price",   label:"價位", multi:false},
 ];
 const CAT_LABEL = Object.fromEntries(CATS.map(c=>[c.key,c.label]));
@@ -620,7 +620,7 @@ function distanceSliderHTML(opts){
   const max = opts.length-1;
   const sel = Object.keys(filters.distance)[0];
   const idx = sel ? opts.indexOf(sel) : max;
-  return `<div class="fgroup"><div class="fglabel">車程距離 <span class="muted">（最遠可接受）</span></div>
+  return `<div class="fgroup"><div class="fglabel">車程 <span class="muted">（最遠可接受）</span></div>
     <div class="slbox"><div class="slwrap">
       <div class="sltrack"><div class="slfill" id="distFill"></div><div class="slticks" id="distTicks"></div></div>
       <div class="slbubble" id="distBubble"></div>
@@ -833,7 +833,7 @@ function renderResultInfo(s){
   const rows=[];
   const add=(k,v)=>{ if(v) rows.push(`<div class="ri"><span class="k">${k}</span><span>${esc(v)}</span></div>`); };
   add("主食", (s.staple||[]).join("、")); add("菜系", (s.cuisine||[]).join("、"));
-  add("餐別", (s.meals||[]).join("、")); add("車程距離", s.distance); add("價位", s.price);
+  add("餐別", (s.meals||[]).join("、")); add("車程", s.distance); add("價位", s.price);
   add("地點", s.location); add("備註", s.note);
   $("#r-info").innerHTML = rows.join("") || '<div class="ri"><span class="k">　</span><span class="k">（沒有其他資訊）</span></div>';
 }
