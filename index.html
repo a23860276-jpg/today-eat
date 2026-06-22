@@ -402,7 +402,7 @@ const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, user1:"我", user2:"伴侶", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, solo:false, user1:"我", user2:"伴侶/朋友", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -453,13 +453,14 @@ function normalize(d){
   out.settings.openMaps = out.settings.openMaps!==false;
   out.settings.excludeDisliked = !!out.settings.excludeDisliked;
   out.settings.user1 = String(out.settings.user1||"").trim().slice(0,12) || "我";
-  out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "伴侶";
+  out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "伴侶/朋友";
   var _h = d.settings && d.settings.home; out.settings.home = (_h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||DEFAULT_HOME.label), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng), area:String(_h.area||"")||DEFAULT_HOME.area} : Object.assign({},DEFAULT_HOME);
   out.settings.googleKey = String(out.settings.googleKey||"");
   out.settings.homeSet = !!out.settings.homeSet;
   out.settings.homeHintDismissed = !!out.settings.homeHintDismissed;
   out.settings.drawIntroSeen = !!out.settings.drawIntroSeen;
   out.settings.chainNearest = out.settings.chainNearest!==false;
+  out.settings.solo = !!out.settings.solo;
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
   return out;
 }
@@ -586,7 +587,7 @@ function collapseChains(list){
 }
 function currentCandidates(){
   let c = state.stores.filter(matchesFilters);
-  if(state.settings.excludeDisliked) c = c.filter(s=> (s.votes||[]).indexOf("no")<0);
+  if(state.settings.excludeDisliked) c = c.filter(s=> state.settings.solo ? (s.votes||[])[0]!=="no" : (s.votes||[]).indexOf("no")<0);
   c = collapseChains(c);
   return c;
 }
@@ -608,7 +609,7 @@ function renderHome(){
 let currentList=[], currentRelaxed=false, currentPick=null;
 let vetoUsed={}, vetoedIds=[], vetoDisabled=[false,false]; // 兩人否決權：每輪每人各一次
 function resetRound(){ vetoUsed={}; vetoedIds=[]; }
-function userNames(){ return [ state.settings.user1||"我", state.settings.user2||"伴侶" ]; }
+function userNames(){ return [ state.settings.user1||"我", state.settings.user2||"伴侶/朋友" ]; }
 function applyAvoid(cands){
   if(!state.settings.avoidRecent) return {list:cands, relaxed:false};
   const recent = state.log.slice(0, state.settings.avoidWindow).map(x=>x.id);
@@ -636,6 +637,7 @@ function openResult(list, relaxed){
   currentPick = pick;
   const animate = state.settings.animation && !reducedMotion() && list.length>1;
   const u = userNames();
+  const solo = !!state.settings.solo;
   // 否決後是否還有「不同的店」可以換
   const remaining = list.filter(s=> vetoedIds.indexOf(s.id)<0 && s.id!==pick.id).length;
   const noMore = remaining===0;
@@ -645,10 +647,10 @@ function openResult(list, relaxed){
     const label = used ? esc(u[i])+"（已換過）" : "<svg class='bic' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 14V2'/><path d='M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z'/></svg> "+esc(u[i])+" 不喜歡";
     return `<button class="btn veto" id="veto${i}" ${vetoDisabled[i]?"disabled":""}>${label}</button>`;
   };
-  const noMoreNote = (noMore && (!vetoUsed[0] || !vetoUsed[1]))
+  const noMoreNote = (noMore && (solo ? !vetoUsed[0] : (!vetoUsed[0] || !vetoUsed[1])))
     ? '<div class="relaxnote">沒有更多可以換的店了，就從這裡決定吧 🙂</div>' : '';
   const showIntro = !state.settings.drawIntroSeen;
-  const intro = showIntro ? '<div class="drawintro"><span class="di-ic">💡</span><div>不滿意這間嗎？按「不喜歡」可以換一間——但<b>兩人各只有 1 次</b>。用完、或按下「就吃這間」就<b>定案</b>囉，才不會一直抽個沒完 😆</div></div>' : '';
+  const intro = showIntro ? ('<div class="drawintro"><span class="di-ic">💡</span><div>不滿意這間嗎？按「不喜歡」可以換一間——但<b>'+(solo?"只有 1 次":"兩人各只有 1 次")+'</b>。用完、或按下「就吃這間」就<b>定案</b>囉，才不會一直抽個沒完 😆</div></div>') : '';
   if(showIntro){ state.settings.drawIntroSeen = true; save(); }
   $("#resultBody").innerHTML = `
     ${relaxed?'<div class="relaxnote">符合的店最近都吃過了，已暫時不避開最近紀錄 🙂</div>':''}
@@ -661,7 +663,7 @@ function openResult(list, relaxed){
     ${intro}
     <div class="formbtns" style="margin-top:18px">
       ${vbtn(0)}
-      ${vbtn(1)}
+      ${solo?"":vbtn(1)}
     </div>
     <button class="btn primary" id="acceptBtn" style="width:100%; margin-top:10px; padding:16px; font-size:18px">就吃這間！</button>
     <div style="display:flex; gap:18px; justify-content:center; margin-top:12px">
@@ -669,7 +671,7 @@ function openResult(list, relaxed){
       <button class="linkbtn" id="resultClose">關閉</button>
     </div>`;
   $("#veto0").onclick = ()=> vetoPick(0);
-  $("#veto1").onclick = ()=> vetoPick(1);
+  { const _v1=$("#veto1"); if(_v1) _v1.onclick = ()=> vetoPick(1); }
   $("#acceptBtn").onclick = acceptPick;
   $("#mapBtn").onclick = ()=> openMaps(currentPick);
   $("#resultClose").onclick = closeResult;
@@ -785,7 +787,7 @@ function renderStores(){
       <div class="nm">${esc(s.name)}</div>
       <div class="meta">${esc(storeMetaLine(s))}${s.distance? " · "+esc(s.distance):""}</div>
       ${meals?`<div class="tags">${meals}</div>`:""}
-      <div class="votes">${vrow(0)}${vrow(1)}</div>
+      <div class="votes">${vrow(0)}${state.settings.solo?"":vrow(1)}</div>
     </div>`;
   }).join("");
 }
@@ -881,10 +883,11 @@ function renderSettings(){
     </div>
 
     <div class="sect">
-      <h2>兩位成員（否決／投票用）</h2>
-      <div class="row"><div class="lbl">成員 1 名稱</div><input class="tin nameinput" id="set-user1" type="text" maxlength="8" value="${esc(st.user1||"我")}"></div>
-      <div class="row"><div class="lbl">成員 2 名稱</div><input class="tin nameinput" id="set-user2" type="text" maxlength="8" value="${esc(st.user2||"伴侶")}"></div>
-      <div class="hint" style="margin:10px 0 4px">這兩個名字會用在：抽選結果的「○○ 不喜歡」否決鈕（每人每輪一次），以及每間店家卡片上的投票（喜歡／普通／不喜歡）。</div>
+      <h2>${st.solo?"成員（否決／投票用）":"兩位成員（否決／投票用）"}</h2>
+      <div class="row"><div class="lbl">單人模式<small>只有你一個人——關閉另一位的否決與投票</small></div><input type="checkbox" id="set-solo" ${st.solo?"checked":""}></div>
+      <div class="row"><div class="lbl">${st.solo?"你的名稱":"成員 1 名稱"}</div><input class="tin nameinput" id="set-user1" type="text" maxlength="8" value="${esc(st.user1||"我")}"></div>
+      ${st.solo?"":`<div class="row"><div class="lbl">成員 2 名稱</div><input class="tin nameinput" id="set-user2" type="text" maxlength="8" value="${esc(st.user2||"伴侶/朋友")}"></div>`}
+      <div class="hint" style="margin:10px 0 4px">${st.solo?"單人模式：只有你；否決權只有一次，店家卡片也只有你投票。":"這兩個名字會用在：抽選結果的「○○ 不喜歡」否決鈕（每人每輪一次），以及每間店家卡片上的投票（喜歡／普通／不喜歡）。"}</div>
     </div>
 
     <div class="sect">
@@ -914,7 +917,8 @@ function renderSettings(){
   $("#set-anim").onchange  = e=>{ state.settings.animation=e.target.checked; save(); };
   $("#set-maps").onchange  = e=>{ state.settings.openMaps=e.target.checked; save(); };
   $("#set-user1").onchange = e=>{ state.settings.user1=(e.target.value||"").trim().slice(0,8)||"我"; e.target.value=state.settings.user1; save(); };
-  $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"伴侶"; e.target.value=state.settings.user2; save(); };
+  if($("#set-user2")) $("#set-user2").onchange = e=>{ state.settings.user2=(e.target.value||"").trim().slice(0,8)||"伴侶/朋友"; e.target.value=state.settings.user2; save(); };
+  if($("#set-solo")) $("#set-solo").onchange = e=>{ state.settings.solo=e.target.checked; save(); renderSettings(); renderStores(); if(currentTab==="home") renderHome(); };
   if($("#btn-homeset")) $("#btn-homeset").onclick = setHomeFromInput;
   if($("#btn-tour")) $("#btn-tour").onclick = function(){ startTour(); };
   if($("#btn-autodist")) $("#btn-autodist").onclick = autoFillDistances;
