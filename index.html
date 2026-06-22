@@ -141,6 +141,9 @@
   .fglabel{font-size:12px; font-weight:800; color:var(--muted); margin-bottom:9px; letter-spacing:.6px;}
   .fglabel .muted{font-weight:500; letter-spacing:0;}
   .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  /* 抽選頁標籤：固定一行、平均填滿、字體隨寬度縮放（窄手機也不換行）*/
+  #filters .chips{ flex-wrap:nowrap; gap:5px; }
+  #filters .chip{ flex:1 1 0; min-width:0; padding:9px 5px; text-align:center; white-space:nowrap; font-size:clamp(12px,3.5vw,15px); }
   .chip{ border:1.5px solid var(--chip-bd); background:var(--chip); color:var(--chip-tx);
     border-radius:999px; padding:9px 15px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;
     transition:transform .12s, background .15s, color .15s, border-color .15s;}
