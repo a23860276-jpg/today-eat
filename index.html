@@ -349,6 +349,16 @@
   .segctl{ display:inline-flex; background:var(--chip); border:1px solid var(--line); border-radius:11px; padding:3px; gap:2px; flex:0 0 auto; }
   .segctl button{ border:none; background:none; color:var(--muted); font-size:13px; font-weight:600; padding:7px 12px; border-radius:8px; cursor:pointer; transition:color .15s; }
   .segctl button.on{ background:var(--grad); color:#fff; font-weight:700; box-shadow:0 2px 6px rgba(255,86,48,.3); }
+  .tour-addr .onb-desc{ font-size:14.5px; line-height:1.7; color:var(--text); opacity:.92; margin:0 0 14px; }
+  .tour-addr .onb-desc b{ color:var(--brand); }
+  .onb-input{ width:100%; box-sizing:border-box; padding:13px 14px; border:1.5px solid var(--line); border-radius:12px; background:var(--bg); color:var(--text); font-size:15px; font-family:inherit; outline:none; }
+  .onb-input:focus{ border-color:var(--brand); }
+  .onb-status{ font-size:13.5px; line-height:1.6; margin:11px 2px 2px; min-height:18px; color:var(--muted); }
+  .onb-status.working{ color:var(--brand); font-weight:600; }
+  .onb-status.done{ color:var(--inc); font-weight:700; }
+  .onb-status.err{ color:var(--exc); font-weight:600; }
+  .tour-addr .tour-next{ width:100%; margin-top:16px; }
+  .onb-skip{ display:block; width:100%; margin-top:10px; background:none; border:none; color:var(--muted); font-size:13.5px; cursor:pointer; padding:7px; font-family:inherit; }
 </style>
 </head>
 <body class="tab-home">
@@ -1566,21 +1576,19 @@ const TOUR = [
       {s:0,t:"😭",big:true}
     ], caption:"是不是很熟悉？😅<br>這個 App 就是來終結這種對話的——花一分鐘看怎麼用 👇",
     next:"好，教我怎麼用" },
+  { tab:"home", address:true, align:"center",
+    title:"先設定你家的位置 📍" },
   { tab:"stores", target:"#addStoreBtn", align:"center",
-    title:"第一步：把「會去吃的店」放進來",
-    body:"點右上角這顆「＋ 新增」就能加一間店。三個小提醒：\n・店名盡量打正確，自動功能和地圖才找得到它。\n・只加你「真的會去吃」的店——不然抽到一堆不想去的也是白抽。\n・分類和距離現在填、先空著都可以，之後能用自動功能補。",
+    title:"想加自己的店？點這裡",
+    body:"這裡已經放了一些範例店家。要加你和家人的口袋名單，就點右上角「＋ 新增」。\n小提醒：店名打正確一點（自動功能和地圖才找得到）、只加真的會去吃的店；距離之後到「設定 → 一鍵自動算距離」就能再補。",
     next:"了解，下一步" },
-  { tab:"settings", target:"#onb-auto", align:"start",
-    title:"第二步：設定一次，之後超省事",
-    body:"這區最重要的是先設好「家的位置」（必填）——它是所有距離的基準點。\n設好之後，「一鍵自動算距離」和「一鍵自動分類」就會幫你把店家的距離、分類自動補好，不用一筆一筆慢慢打。",
-    next:"下一步" },
   { tab:"home", target:"#decideBtn", align:"center",
-    title:"第三步：剩下的交給這顆按鈕",
-    body:"在這頁點今天的條件（點一下＝要、再點一下＝不要、不點＝不限），再按大大的「決定！」就會幫你抽一間。\n抽到不滿意？兩個人各有一次否決權可以換店；決定好就按「就吃這間」，自動帶你導航過去。",
+    title:"剩下的，交給這顆按鈕",
+    body:"在這頁挑今天想吃的：主食／菜系點一下＝綠色要、再點＝紅色不要；餐別選一個；車程、價位用拖的選範圍。\n然後按大大的「決定！」就會幫你抽一間。抽到不想吃？按「不喜歡」可以換（每人一次）；決定好按「就吃這間」，直接帶你導航過去。",
     next:"最後一步" },
   { tab:"home", target:null, align:"center",
-    title:"完成！你已經學會了 🎉",
-    body:"現在這些是範例店家，給你參考用。想建立自己的清單，到「設定 → 清除所有資料」清空後，再照剛剛的方式加入你和家人的口袋名單就好。\n祝你們每一餐都不再煩惱！",
+    title:"完成！開始用吧 🎉",
+    body:"以後每餐打開 App、挑個條件、按「決定！」就好，不用再為「吃什麼」煩惱了。\n（範例店家可留著參考，或到「設定 → 清除所有資料」清空，換成你自己的清單。）",
     next:"開始使用" },
 ];
 let tourIdx = 0;
@@ -1593,7 +1601,7 @@ let tourIdx = 0;
       '<div class="tour-top"><span class="tour-step" id="tourStep"></span><button class="tour-skip" id="tourSkip">跳過教學</button></div>'+
       '<div class="tour-title" id="tourTitle"></div>'+
       '<div class="tour-body" id="tourBody"></div>'+
-      '<div class="tour-nav"><button class="tour-prev" id="tourPrev">上一步</button><button class="tour-next" id="tourNext">下一步</button></div>'+
+      '<div class="tour-nav" id="tourNav"><button class="tour-prev" id="tourPrev">上一步</button><button class="tour-next" id="tourNext">下一步</button></div>'+
     '</div>';
   document.body.appendChild(t);
   t.querySelector("#tourSkip").onclick = function(){ endTour(); };
@@ -1613,25 +1621,91 @@ function sceneHTML(step){
   }).join("");
   return '<div class="tour-scene">'+rows+'</div><div class="tour-scene-cap" style="animation-delay:'+((step.scene.length-1)*0.9+0.5).toFixed(2)+'s">'+step.caption+'</div>';
 }
+function addressHTML(){
+  return '<div class="tour-addr">'+
+    '<p class="onb-desc">先告訴我你家大概在哪，我就<b>立刻幫你把每間店的距離算好</b>——之後抽選用「車程」篩選才會準，超方便。</p>'+
+    '<input type="search" id="onbAddr" class="onb-input" placeholder="住家地址或附近地標（例：嶺東科技大學）" autocomplete="off">'+
+    '<div class="onb-status" id="onbStatus"></div>'+
+    '<button class="tour-next" id="onbGo">設定，並自動算距離</button>'+
+    '<button class="onb-skip" id="onbSkip">先跳過，之後到「設定」也能用</button>'+
+  '</div>';
+}
+function wireAddressStep(){
+  var go=$("#onbGo"), skip=$("#onbSkip"), inp=$("#onbAddr");
+  if(go) go.onclick = runOnboardAddress;
+  if(skip) skip.onclick = function(){ tourGo(tourIdx+1); };
+  if(inp) inp.onkeydown = function(e){ if(e.key==="Enter"){ e.preventDefault(); runOnboardAddress(); } };
+}
+async function runOnboardAddress(){
+  var inp=$("#onbAddr"), go=$("#onbGo"), skip=$("#onbSkip"), status=$("#onbStatus");
+  var q=(inp.value||"").trim();
+  if(!q){ status.className="onb-status err"; status.textContent="先輸入你家地址或附近地標 🙂"; inp.focus(); return; }
+  go.disabled=true; inp.disabled=true; skip.style.visibility="hidden";
+  status.className="onb-status working"; status.textContent="正在定位你家…";
+  try{
+    if(!proxyReady()) throw {code:"NOPROXY"};
+    var g = await googleGeocode(q, state.settings.home, true);
+    if(!g){ status.className="onb-status err"; status.textContent="查不到這個地點，換個地標或地址再試一次。"; go.disabled=false; inp.disabled=false; skip.style.visibility=""; return; }
+    state.settings.home = {label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""};
+    state.settings.homeSet=true; save();
+    var todo = state.stores.filter(function(s){ return !s.distance; });
+    var unlocked = await requireUnlock("distance");
+    if(unlocked && todo.length){
+      status.textContent="位置設定好了 ✅ 正在幫 "+todo.length+" 間店算距離，請稍候…（0/"+todo.length+"）";
+      var n = await onboardAutoDistances(todo, function(c){ status.textContent="正在算距離，請稍候…（"+c+"/"+todo.length+"）"; });
+      status.className="onb-status done"; status.textContent="搞定！已幫 "+n+" 間店算好距離 🎉";
+    } else {
+      status.className="onb-status done"; status.textContent="位置設定好了 ✅";
+    }
+    await sleep(900);
+    tourGo(tourIdx+1);
+  }catch(e){
+    status.className="onb-status err";
+    status.textContent = (e&&e.code==="AUTH") ? "服務暫時無法使用，請稍後再試（也可先跳過）。" : "連線失敗，請檢查網路後再試（也可先跳過）。";
+    go.disabled=false; inp.disabled=false; skip.style.visibility="";
+  }
+}
+async function onboardAutoDistances(todo, onProgress){
+  var home = state.settings.home, done=0, idx=0;
+  async function worker(){
+    while(idx < todo.length){
+      var s = todo[idx++];
+      try{
+        var g = await googleGeocode(s.name, home);
+        if(g){ var bucket = await distanceBucketFor(home, {lat:g.lat, lng:g.lng}); if(bucket){ s.distance=bucket; s.updatedAt=Date.now(); } }
+      }catch(e){}
+      done++; if(onProgress) onProgress(done);
+    }
+  }
+  var ws=[]; for(var i=0;i<Math.min(5, todo.length);i++) ws.push(worker());
+  await Promise.all(ws);
+  save(); renderStores(); renderSettings(); renderHomeHint(); if(currentTab==="home") renderHome();
+  return done;
+}
 function tourGo(i){
   if(i<0) return;
   if(i>=TOUR.length){ endTour(); return; }
   tourIdx = i;
   const step = TOUR[i];
   switchTab(step.tab);
+  const nav = $("#tourNav");
   if(step.scene){
     $("#tourStep").style.display = "none";
     $("#tourTitle").style.display = "none";
     $("#tourBody").innerHTML = sceneHTML(step);
+    nav.style.display = ""; $("#tourPrev").style.display = "none"; $("#tourNext").textContent = step.next || "下一步";
+  } else if(step.address){
+    $("#tourStep").style.display = ""; $("#tourStep").textContent = i + " / " + (TOUR.length-1);
+    $("#tourTitle").style.display = ""; $("#tourTitle").textContent = step.title;
+    $("#tourBody").innerHTML = addressHTML();
+    nav.style.display = "none";
+    wireAddressStep();
   } else {
-    $("#tourStep").style.display = "";
-    $("#tourStep").textContent = i + " / " + (TOUR.length-1);
-    $("#tourTitle").style.display = "";
-    $("#tourTitle").textContent = step.title;
+    $("#tourStep").style.display = ""; $("#tourStep").textContent = i + " / " + (TOUR.length-1);
+    $("#tourTitle").style.display = ""; $("#tourTitle").textContent = step.title;
     $("#tourBody").textContent = step.body;
+    nav.style.display = ""; $("#tourPrev").style.display = i===0 ? "none" : ""; $("#tourNext").textContent = step.next || "下一步";
   }
-  $("#tourPrev").style.display = i===0 ? "none" : "";
-  $("#tourNext").textContent = step.next || "下一步";
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ positionTour(step); }); });
 }
 function positionTour(step){
@@ -1660,7 +1734,9 @@ function positionTour(step){
   } else {
     ring.classList.add("notarget");
     ring.style.top="-60px"; ring.style.left="-60px"; ring.style.width="0px"; ring.style.height="0px";
-    card.style.bottom="auto"; card.style.top="50%"; card.style.transform="translateY(-50%)"; card.style.maxHeight="74vh";
+    card.style.bottom="auto";
+    if(step.address){ card.style.top="14px"; card.style.transform="none"; card.style.maxHeight="82vh"; }
+    else { card.style.top="50%"; card.style.transform="translateY(-50%)"; card.style.maxHeight="74vh"; }
   }
 }
 
