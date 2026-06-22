@@ -1721,14 +1721,16 @@ function positionTour(step){
       ring.style.width = (r.width+pad*2)+"px";
       ring.style.height = (r.height+pad*2)+"px";
       card.style.transform = "none";
-      const gapBelow = window.innerHeight - (r.top+r.height) - 80;
-      const gapAbove = r.top - 80;
-      if(gapBelow >= gapAbove){
-        card.style.top = (r.top+r.height+14)+"px"; card.style.bottom = "auto";
-        card.style.maxHeight = Math.max(150, gapBelow-14)+"px";
+      if((r.top + r.height/2) < window.innerHeight*0.5){
+        // 目標在上半 → 卡片釘在底部（避開 tabbar 與安全區）
+        card.style.top = "auto";
+        card.style.bottom = "calc(env(safe-area-inset-bottom,0px) + 80px)";
+        card.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 132)+"px";
       } else {
-        card.style.bottom = (window.innerHeight - r.top + 14)+"px"; card.style.top = "auto";
-        card.style.maxHeight = Math.max(150, gapAbove-14)+"px";
+        // 目標在下半 → 卡片釘在頂部（避開瀏海安全區）
+        card.style.bottom = "auto";
+        card.style.top = "calc(env(safe-area-inset-top,0px) + 12px)";
+        card.style.maxHeight = Math.max(160, r.top - 80)+"px";
       }
     });
   } else {
