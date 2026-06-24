@@ -459,10 +459,10 @@ const DEFAULT_TAGS = {
   price:["100以內","100~200","200~300","300~500","500以上"],
 };
 const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
-const DEFAULT_HOME = {label:"向上路五段（南屯）", lat:24.1513579, lng:120.6102249, area:"臺中市"};
+// （已移除預設位置：家的位置預設為「未設定」，要先設定才能用自動算距離）
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, solo:false, theme:"auto", user1:"我", user2:"伴侶/朋友", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:Object.assign({},DEFAULT_HOME)}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, solo:false, theme:"auto", user1:"我", user2:"伴侶/朋友", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:{label:"", lat:null, lng:null, area:""}}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -522,9 +522,9 @@ function normalize(d){
   out.settings.excludeDisliked = !!out.settings.excludeDisliked;
   out.settings.user1 = String(out.settings.user1||"").trim().slice(0,12) || "我";
   out.settings.user2 = String(out.settings.user2||"").trim().slice(0,12) || "伴侶/朋友";
-  var _h = d.settings && d.settings.home; out.settings.home = (_h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||DEFAULT_HOME.label), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng), area:String(_h.area||"")||DEFAULT_HOME.area} : Object.assign({},DEFAULT_HOME);
+  var _h = d.settings && d.settings.home, _hs = !!(d.settings && d.settings.homeSet); out.settings.home = (_hs && _h && numOrNull(_h.lat)!=null) ? {label:String(_h.label||""), lat:numOrNull(_h.lat), lng:numOrNull(_h.lng), area:String(_h.area||"")} : {label:"", lat:null, lng:null, area:""};
   out.settings.googleKey = String(out.settings.googleKey||"");
-  out.settings.homeSet = !!out.settings.homeSet;
+  out.settings.homeSet = out.settings.home.lat != null;
   out.settings.homeHintDismissed = !!out.settings.homeHintDismissed;
   out.settings.drawIntroSeen = !!out.settings.drawIntroSeen;
   out.settings.chainNearest = out.settings.chainNearest!==false;
@@ -1017,9 +1017,9 @@ function renderSettings(){
 
     <div class="sect" id="onb-auto">
       <h2>自動填寫（需網路）</h2>
-      <div class="row"><div class="lbl">家的位置<small>距離的基準點｜${st.homeSet?("目前："+esc((st.home&&st.home.label)||"")):"<span class='hh-warn'>尚未設定（先用預設位置）</span>"}</small></div></div>
+      <div class="row"><div class="lbl">家的位置<small>距離的基準點｜${st.homeSet?("目前："+esc((st.home&&st.home.label)||"")):"<span class='hh-warn'>尚未設定（設定後才能自動算距離）</span>"}</small></div></div>
       <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
-      <div class="row"><div class="lbl">一鍵自動算距離<small>自動幫「還沒填距離」的店估算距離；找不到的會略過</small></div><button class="btn ghost" id="btn-autodist">開始</button></div>
+      <div class="row"><div class="lbl">一鍵自動算距離<small>${st.home&&st.home.lat!=null?"自動幫「還沒填距離」的店估算距離；找不到的會略過":"<span class='hh-warn'>請先在上面設定「家的位置」</span>"}</small></div><button class="btn ghost" id="btn-autodist"${st.home&&st.home.lat!=null?"":" disabled"}>開始</button></div>
       <div class="row"><div class="lbl">一鍵自動分類（AI 判讀）<small>自動幫「還沒分類」的店填主食／菜系／餐別／價位（不含距離）；填完建議檢查一下</small></div><button class="btn ghost" id="btn-autoclass">開始</button></div>
       <div class="ver" style="text-align:left;margin:6px 2px 2px">距離與分類為自動估算，僅供參考。導航由 Google 地圖提供。</div>
     </div>
