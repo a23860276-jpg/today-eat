@@ -359,6 +359,13 @@
   .onb-status.err{ color:var(--exc); font-weight:600; }
   .tour-addr .tour-next{ width:100%; margin-top:16px; }
   .onb-skip{ display:block; width:100%; margin-top:10px; background:none; border:none; color:var(--muted); font-size:13.5px; cursor:pointer; padding:7px; font-family:inherit; }
+  .city-desc{ font-size:13.5px; color:var(--muted); line-height:1.6; margin:2px 0 14px; }
+  .city-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .citychip{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:11px 4px; border:1.5px solid var(--chip-bd); background:var(--chip); color:var(--text); border-radius:12px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
+  .citychip small{ font-size:10.5px; font-weight:500; color:var(--muted); }
+  .citychip.on{ background:var(--grad); border-color:transparent; color:#fff; box-shadow:0 4px 12px rgba(255,86,48,.3); }
+  .citychip.on small{ color:rgba(255,255,255,.85); }
+  .citychip.off{ opacity:.4; cursor:not-allowed; }
 </style>
 </head>
 <body class="tab-home">
@@ -1035,7 +1042,7 @@ function renderSettings(){
       <div class="row"><div class="lbl">匯出 JSON<small>下載一份備份檔</small></div><button class="btn ghost" id="btn-export">匯出</button></div>
       <div class="row"><div class="lbl">匯入 JSON<small>從備份檔還原（會覆蓋現有資料）</small></div><button class="btn ghost" id="btn-import">匯入</button></div>
       <div class="row"><div class="lbl">合併匯入店家<small>加入清單檔的店家，不覆蓋現有資料（重複店名自動略過）</small></div><button class="btn ghost" id="btn-merge">合併</button></div>
-      <div class="row"><div class="lbl">重新帶入在地起始店家<small>台中彰化人氣店家，已有的會自動略過</small></div><button class="btn ghost" id="btn-sample">帶入</button></div>
+      <div class="row"><div class="lbl">重新匯入店家清單<small>選縣市匯入該地店家（目前：台中、彰化）</small></div><button class="btn ghost" id="btn-sample">選縣市</button></div>
       <div class="row"><div class="lbl" style="color:var(--exc)">清除所有資料<small>店家、設定、紀錄全部清空</small></div><button class="btn danger" id="btn-clear">清除</button></div>
     </div>
 
@@ -1069,7 +1076,7 @@ function renderSettings(){
   $("#btn-export").onclick = exportData;
   $("#btn-import").onclick = ()=> $("#importFile").click();
   $("#btn-merge").onclick  = ()=> $("#mergeFile").click();
-  $("#btn-sample").onclick = loadSamples;
+  $("#btn-sample").onclick = openCityImport;
   $("#btn-clear").onclick  = clearAll;
   $$("#settingsBody .del").forEach(b=> b.onclick=()=>{ state.log.splice(parseInt(b.dataset.logi),1); save(); renderSettings(); });
 }
@@ -1132,7 +1139,8 @@ function clearAll(){
   toast("已清除所有資料");
 }
 // 嶺東／南屯一帶人氣店家作為起始資料（評價、車程為概估，請依實際情況自行調整）
-const SAMPLE = [
+const CITY_LISTS = {
+"台中": [
   {"name": "肉蛋中西式早餐店 創始店", "staple": ["麵食", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "中西式早餐；吐司、蛋餅、漢堡類"},
   {"name": "京都勝牛-台中LaLaport店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "日式炸牛排定食"},
   {"name": "吉蜂蒸餃 創始店", "staple": ["麵食", "麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "100以內", "note": "蒸餃、湯麵類"},
@@ -1172,7 +1180,6 @@ const SAMPLE = [
   {"name": "艾初早餐 嶺東精科店", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "早午餐"},
   {"name": "阿鍋家-鍋燒煮義（嶺東店）", "staple": ["麵", "鍋物", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "鍋燒麵、義麵／飯類"},
   {"name": "台客大食館（原台客燒肉粥）", "staple": ["飯", "麵", "其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "燒肉粥、飯麵類"},
-  {"name": "鹿港老堯師肉包", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "", "price": "100以內", "note": "肉包、饅頭類"},
   {"name": "燒瓶子・大肆の鍋 台中南屯店", "staple": ["鍋物", "飯", "麵"], "cuisine": ["中式", "日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "個人鍋／火鍋"},
   {"name": "述憶灶咖 早午餐.私廚.外燴", "staple": ["麵食", "飯", "其他"], "cuisine": ["西式", "中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": "早午餐、私廚外燴"},
   {"name": "順柔烏龍麵（うどん しなやか）飯類／烏冬", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "烏龍麵、飯類"},
@@ -1240,6 +1247,12 @@ const SAMPLE = [
   {"name": "奇香小吃", "staple": ["麵", "飯", "麵食"], "cuisine": ["中式"], "meals": ["午餐"], "distance": "", "price": "100~200", "note": "牛肉麵、麻醬麵、魯肉飯、餛飩（評論數少）"},
   {"name": "粧餅商行", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "古早味冷盤、蔥油餅、牛肉捲餅、綠豆煎餅"},
   {"name": "宵夜場 幸福小館", "staple": ["飯", "麵", "麵食"], "cuisine": ["中式"], "meals": ["宵夜"], "distance": "", "price": "100~200", "note": "蛋餅、牛腩飯、炒泡麵（評論數少，參考性較低）"},
+  {"name": "MR.GAPAO嘎拋先生-打拋專賣店", "staple": ["飯", "麵", "麵食"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "Chris Cafe （港式餐廳）", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "來呷飯川食堂（勤美店）", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""}
+],
+"彰化": [
+  {"name": "鹿港老堯師肉包", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "", "price": "100以內", "note": "肉包、饅頭類"},
   {"name": "燒瓶子。大肆の鍋 彰化店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "個人鍋、自選食材、泰式／牛奶鍋"},
   {"name": "嗑肉石鍋 彰化四維店（二代店）", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": "石頭火鍋"},
   {"name": "這一小鍋 彰化旭光店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "個人小火鍋"},
@@ -1277,19 +1290,111 @@ const SAMPLE = [
   {"name": "雲河星空景觀餐廳", "staple": [], "cuisine": ["中式", "西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": "山景星空景觀餐廳，入場費NT$300含抵$100；菜系不明"},
   {"name": "鹿港圓環頂麵食館", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": "乾麵、陽春麵、餛飩、水餃、滷味（陽春麵$40/$80）"},
   {"name": "禾火食堂（日式豬排）", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": "日式豬排丼、定食、洋食"},
-  {"name": "品先蚵仔煎", "staple": ["其他", "飯"], "cuisine": ["中式"], "meals": ["午餐"], "distance": "", "price": "100~200", "note": "蚵仔煎、蚵仔粥、貢丸湯、綜合蛋"}
-];
-function loadSamples(){
-  const have = new Set(state.stores.map(s=>s.name));
-  const toAdd = SAMPLE.filter(s=> !have.has(s.name));
-  if(toAdd.length===0){ toast("起始店家都已經在清單裡了 🙂"); return; }
-  if(state.stores.length>0 && !confirm("會加入 "+toAdd.length+" 間還沒有的起始店家（重複的自動略過），確定嗎？")) return;
-  toAdd.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
-  save();
-  renderStores();
-  toast("已加入 "+toAdd.length+" 間起始店家");
-  switchTab("stores");
+  {"name": "品先蚵仔煎", "staple": ["其他", "飯"], "cuisine": ["中式"], "meals": ["午餐"], "distance": "", "price": "100~200", "note": "蚵仔煎、蚵仔粥、貢丸湯、綜合蛋"},
+  {"name": "宮堂豬腳", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "杉玉Sugi tama", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "寿司美術-第一市場", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "スシロー壽司郎 彰化金馬店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "麵屋三金", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "阿華羊肉店 溫體羊肉專賣", "staple": ["鍋物", "其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "湯川製麵 和美店", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "仁之初 北海道湯咖喱專賣 彰化店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "地6攤牛排 彰化店", "staple": ["其他"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "小嶋家 小卷麵線", "staple": ["麵", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "越嶼風味越南手工河粉", "staple": ["其他"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "食鮮森鐵板燒-大埔店", "staple": ["其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "丹雲小餐館 中式小炒", "staple": ["其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "陶板屋 彰化東民店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "原山拉麵", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "HOUSE V 好室鍋物-彰化店", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "矮子咖哩 カレーライス專門店", "staple": ["飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "溪湖阿秀羊肉爐", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "MR.GAPAO嘎拋先生-打拋專賣店-員林店", "staple": ["飯"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "皇品印度料理", "staple": ["飯", "麵食"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "來呷飯川食堂-彰化中山店", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "立軒閣文化廚苑", "staple": ["飯", "其他"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "私房泰(彰化店)", "staple": ["飯"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "西安飯莊", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "洵·職人工作坊（燒烤居酒屋）", "staple": ["飯", "其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "施家米糕", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "十夜_海味拉麵", "staple": ["麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "興瑞食堂 泰式料理", "staple": ["飯", "麵"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "福田家咖哩食堂", "staple": ["飯", "麵"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "Bistro Chillax秋蕾義法餐酒館", "staple": ["飯"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "你好義式", "staple": ["飯", "麵食"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "俗女小餐館 Ordinary Woman Kitchen", "staple": ["飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "鍋泰暖 員林創始店", "staple": ["鍋物"], "cuisine": ["東南亞"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "［釀善］三津制麵 員林中正店", "staple": ["麵"], "cuisine": ["中式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "鹽岸-島嶼的義法料理", "staple": ["飯"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "小餐館 Steak Bistro", "staple": ["其他"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "星野手作料亭", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "Jammy26", "staple": ["飯"], "cuisine": ["西式"], "meals": ["午餐", "晚餐"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "寬燒肉-鹿港總店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "湯川製麵 彰化店", "staple": ["麵", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "燒肉肉 SHAO ROU ROU 日式燒肉", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "彰記麻辣火鍋", "staple": ["鍋物"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "本格-和牛燒肉放題 彰化員林店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "脂本燒肉 ZHIBEN YKNK 彰化店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "町參酒食", "staple": ["其他", "飯"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "官東燒肉-員林店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "依舊燒肉", "staple": ["其他"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "老梗談 鐵鍋燉魚/酸菜魚", "staple": ["鍋物", "飯"], "cuisine": ["中式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "燒瓶子 大肆の鍋-彰化店", "staple": ["鍋物"], "cuisine": ["日式"], "meals": ["午餐", "晚餐", "宵夜"], "distance": "", "price": "300~500", "note": ""},
+  {"name": "曹園涼麵 抄手專賣店", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "北門口阿英陽春麵", "staple": ["麵"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "街口飯糰（中正店）", "staple": ["飯", "其他"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "阿泉爌肉飯", "staple": ["飯"], "cuisine": ["中式"], "meals": ["早餐", "午餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "向陽手作 早餐 雞湯 蛋黃酥", "staple": ["其他"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "", "price": "100~200", "note": ""},
+  {"name": "正彰化肉圓", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "京巧手工湯包", "staple": ["麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "永合湯包-排骨酥麵", "staple": ["麵", "麵食"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐", "宵夜"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "川爌肉飯", "staple": ["飯", "麵"], "cuisine": ["中式"], "meals": ["早餐", "午餐", "晚餐", "宵夜"], "distance": "", "price": "100以內", "note": ""},
+  {"name": "姸·烤物", "staple": ["其他"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "200~300", "note": ""},
+  {"name": "脂本燒肉 ZHIBEN YKNK 員林店", "staple": ["其他"], "cuisine": ["日式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "500以上", "note": ""},
+  {"name": "福記爌肉飯", "staple": ["飯"], "cuisine": ["中式"], "meals": ["晚餐", "宵夜"], "distance": "", "price": "100以內", "note": ""}
+]
+};
+const SAMPLE = CITY_LISTS["台中"].concat(CITY_LISTS["彰化"]);
+const COUNTIES = ["台北","新北","基隆","桃園","新竹","苗栗","台中","彰化","南投","雲林","嘉義","台南","高雄","屏東","宜蘭","花蓮","台東","澎湖","金門","連江"];
+let citySel = new Set();
+function openCityImport(){ citySel = new Set(); renderCityGrid(); showModal("#cityModal"); }
+function cityGridHTML(){
+  return COUNTIES.map(function(c){
+    var has = !!CITY_LISTS[c], on = citySel.has(c);
+    return '<button class="citychip'+(on?" on":"")+(has?"":" off")+'" data-city="'+c+'"'+(has?"":" disabled")+'>'+c+'<small>'+(has?(CITY_LISTS[c].length+" 間"):"尚無")+'</small></button>';
+  }).join("");
 }
+function renderCityGrid(){ $("#cityGrid").innerHTML = cityGridHTML(); }
+function doCityImport(){
+  if(citySel.size===0){ toast("請先選一個縣市 🙂"); return; }
+  var have = new Set(state.stores.map(function(s){ return s.name; })), added=0;
+  citySel.forEach(function(c){ (CITY_LISTS[c]||[]).forEach(function(s){
+    if(have.has(s.name)) return;
+    var st=normStore(s); st.id=uid(); state.stores.push(st); have.add(s.name); added++;
+  }); });
+  save(); renderStores(); renderSettings(); if(currentTab==="home") renderHome();
+  hideModal("#cityModal");
+  toast(added ? ("已匯入 "+added+" 間店家 🎉") : "所選縣市的店家都已經在清單裡了 🙂");
+  if(added) switchTab("stores");
+}
+(function buildCityModal(){
+  var m = document.createElement("div");
+  m.className = "modal"; m.id = "cityModal";
+  m.innerHTML = '<div class="sheet">'+
+    '<h2 class="title">重新匯入店家清單</h2>'+
+    '<p class="city-desc">選擇縣市（可複選），把該縣市的店家清單加進來；重複的會自動略過。目前提供台中、彰化。</p>'+
+    '<div class="city-grid" id="cityGrid"></div>'+
+    '<div class="formbtns"><button class="btn ghost" id="cityCancel">取消</button><button class="btn primary" id="cityImport">匯入所選</button></div>'+
+    '</div>';
+  document.body.appendChild(m);
+  m.querySelector("#cityGrid").addEventListener("click", function(e){
+    var b=e.target.closest(".citychip"); if(!b||b.disabled) return;
+    var c=b.dataset.city; if(citySel.has(c)) citySel.delete(c); else citySel.add(c); renderCityGrid();
+  });
+  m.querySelector("#cityImport").onclick = doCityImport;
+  m.querySelector("#cityCancel").onclick = function(){ hideModal("#cityModal"); };
+  m.addEventListener("click", function(e){ if(e.target===m) hideModal("#cityModal"); });
+})();
 
 /* ---------- 距離（Google Places API New 取座標 → 只存級距、不存座標；之後可換 OSRM 精確版） ---------- */
 function proxyReady(){ return !!DISTANCE_PROXY && DISTANCE_PROXY.indexOf("YOUR-WORKER")<0; }
@@ -1576,11 +1681,13 @@ const TOUR = [
       {s:0,t:"😭",big:true}
     ], caption:"是不是很熟悉？😅<br>這個 App 就是來終結這種對話的——花一分鐘看怎麼用 👇",
     next:"好，教我怎麼用" },
+  { tab:"home", county:true, align:"center",
+    title:"先選你的縣市 📍" },
   { tab:"home", address:true, align:"center",
-    title:"先設定你家的位置 📍" },
+    title:"接著，設定你家的位置 📍" },
   { tab:"stores", target:"#addStoreBtn", align:"center",
     title:"想加自己的店？點這裡",
-    body:"這裡已經放了一些範例店家。要加你和家人的口袋名單，就點右上角「＋ 新增」。\n小提醒：店名打正確一點（自動功能和地圖才找得到）、只加真的會去吃的店；距離之後到「設定 → 一鍵自動算距離」就能再補。",
+    body:"想加你和家人的口袋名單，就點右上角「＋ 新增」。\n小提醒：店名打正確一點（自動功能和地圖才找得到）、只加真的會去吃的店。\n（想再帶入整個縣市的清單，到「設定 → 重新匯入店家清單」。）",
     next:"了解，下一步" },
   { tab:"home", target:"#decideBtn", align:"center",
     title:"剩下的，交給這顆按鈕",
@@ -1588,7 +1695,7 @@ const TOUR = [
     next:"最後一步" },
   { tab:"home", target:null, align:"center",
     title:"完成！開始用吧 🎉",
-    body:"以後每餐打開 App、挑個條件、按「決定！」就好，不用再為「吃什麼」煩惱了。\n（範例店家可留著參考，或到「設定 → 清除所有資料」清空，換成你自己的清單。）",
+    body:"以後每餐打開 App、挑個條件、按「決定！」就好，不用再為「吃什麼」煩惱了。\n（想換縣市或補清單，到「設定 → 重新匯入店家清單」隨時都能再匯入。）",
     next:"開始使用" },
 ];
 let tourIdx = 0;
@@ -1620,6 +1727,27 @@ function sceneHTML(step){
     return '<div class="tbub-row '+(m.s?"r":"l")+'"><div class="tbub '+(m.s?"r":"l")+(m.big?" big":"")+'" style="animation-delay:'+(i*0.9).toFixed(2)+'s">'+m.t+'</div></div>';
   }).join("");
   return '<div class="tour-scene">'+rows+'</div><div class="tour-scene-cap" style="animation-delay:'+((step.scene.length-1)*0.9+0.5).toFixed(2)+'s">'+step.caption+'</div>';
+}
+function countyHTML(){
+  return '<div class="tour-county">'+
+    '<p class="onb-desc">先選你住的縣市，我直接幫你帶入在地的店家清單（可複選）。下一步再幫你算距離。</p>'+
+    '<div class="city-grid" id="onbCityGrid">'+cityGridHTML()+'</div>'+
+    '<button class="tour-next" id="onbCityGo">匯入並繼續</button>'+
+    '<button class="onb-skip" id="onbCitySkip">先跳過，之後到「設定」再匯入</button>'+
+  '</div>';
+}
+function wireCountyStep(){
+  var grid=$("#onbCityGrid"), go=$("#onbCityGo"), skip=$("#onbCitySkip");
+  if(grid) grid.onclick = function(e){ var b=e.target.closest(".citychip"); if(!b||b.disabled) return; var c=b.dataset.city; if(citySel.has(c)) citySel.delete(c); else citySel.add(c); grid.innerHTML=cityGridHTML(); };
+  if(go) go.onclick = onboardImportCounties;
+  if(skip) skip.onclick = function(){ tourGo(tourIdx+1); };
+}
+function onboardImportCounties(){
+  if(citySel.size===0){ toast("選一個縣市，或按下面跳過 🙂"); return; }
+  var have=new Set(state.stores.map(function(s){return s.name;})), added=0;
+  citySel.forEach(function(c){ (CITY_LISTS[c]||[]).forEach(function(s){ if(have.has(s.name)) return; var st=normStore(s); st.id=uid(); state.stores.push(st); have.add(s.name); added++; }); });
+  save(); renderStores(); if(currentTab==="home") renderHome();
+  tourGo(tourIdx+1);
 }
 function addressHTML(){
   return '<div class="tour-addr">'+
@@ -1694,6 +1822,13 @@ function tourGo(i){
     $("#tourTitle").style.display = "none";
     $("#tourBody").innerHTML = sceneHTML(step);
     nav.style.display = ""; $("#tourPrev").style.display = "none"; $("#tourNext").textContent = step.next || "下一步";
+  } else if(step.county){
+    $("#tourStep").style.display = ""; $("#tourStep").textContent = i + " / " + (TOUR.length-1);
+    $("#tourTitle").style.display = ""; $("#tourTitle").textContent = step.title;
+    citySel = new Set();
+    $("#tourBody").innerHTML = countyHTML();
+    nav.style.display = "none";
+    wireCountyStep();
   } else if(step.address){
     $("#tourStep").style.display = ""; $("#tourStep").textContent = i + " / " + (TOUR.length-1);
     $("#tourTitle").style.display = ""; $("#tourTitle").textContent = step.title;
@@ -1737,17 +1872,13 @@ function positionTour(step){
     ring.classList.add("notarget");
     ring.style.top="-60px"; ring.style.left="-60px"; ring.style.width="0px"; ring.style.height="0px";
     card.style.bottom="auto";
-    if(step.address){ card.style.top="14px"; card.style.transform="none"; card.style.maxHeight="82vh"; }
+    if(step.address || step.county){ card.style.top="14px"; card.style.transform="none"; card.style.maxHeight="82vh"; }
     else { card.style.top="50%"; card.style.transform="translateY(-50%)"; card.style.maxHeight="74vh"; }
   }
 }
 
 /* ---------- 啟動 ---------- */
-// 首次開啟自動帶入在地起始店家（嶺東／南屯）；清空資料後就不會再自動帶入
-if(localStorage.getItem(KEY)===null){
-  SAMPLE.forEach(s=>{ const st=normStore(s); st.id=uid(); state.stores.push(st); });
-  save();
-}
+// 首次安裝不預先帶入店家；改由新手教學的「選縣市」步驟匯入（見 TOUR 的 county 步驟）
 applyTheme();
 clearFilters();
 renderHome();
