@@ -50,7 +50,7 @@ python3 -m http.server 8000
   - 再加上地址、備註。
 - **兩人投票**：每張店家卡片下方有兩排按鈕（名字可在設定改），兩個人可各自標記**喜歡／普通／不喜歡**；再點一下同一個可取消。
 - **第一次打開 App 時，會自動帶入台中＋彰化的人氣店家**當作起始資料，可自由編輯或刪除。想再匯入可到「設定 →重新匯入店家清單」，**選縣市**匯入（目前提供台中、彰化，可複選）。
-  - 起始資料的車程是**概估值**，請依你的實際情況調整（尤其「車程」是相對你家的車程）。
+  - 起始資料的車程是**概估值**，請依你的實際情況調整（「車程」是相對你**目前所在地址**的車程）。
 
 ### 2. 設定今天的條件（「決定」分頁）
 - 大部分標籤是**點一下＝要**（綠）、**再點一下＝不要**（紅，排除）、**再點＝不限**。沒選的就不限制。例如把「麵」設成不要、把「晚餐」設成要。
@@ -105,7 +105,7 @@ python3 -m http.server 8000
 ---
 
 ## 其他功能
-- **一鍵自動算距離**：「設定 →距離設定」設好「家的位置」、按「開始」，就會用 Google 幫**還沒填距離**的店家推算距離。**只會存「X分鐘內」級距、不保留座標**；查不到的店會列出並略過；**不會覆蓋**已填好的距離。
+- **一鍵自動算距離**：「設定 →自動填寫」先在「**我的地址**」新增地址（**最多 3 組**，可切換「目前所在」）、按「開始」，就會用 Google 幫**還沒算距離**的店家推算距離。**只會存「X分鐘內」級距、不保留座標**；查不到的店會列出並略過；**不會覆蓋**已算好的距離。**不同地址的距離分開保存**，切回去不用重算（抽選頁最上方可看／切換目前地址）。
   - Google 金鑰**藏在後端代理（Cloudflare Worker）**，不會出現在前端網頁——所以這個 App 可以公開給別人用、使用者不用自備金鑰。部署方式見下方。
   - 目前是**直線距離估算**；之後會升級成 OSRM／OpenRouteService 的**實際車程**（程式已預留切換點）。
 - **一鍵自動分類（AI 判讀）**：「設定 →自動填寫」按「開始」，AI（OpenAI，會**上網查證**）幫**還沒分類**的店家填「主食／菜系／餐別／價位」（不含距離）。只填空欄、**不覆蓋**你已填的；AI 不確定的會略過。**AI 是參考、可能有誤，填完請逐一檢查**（尤其價位）。一樣走後端代理、金鑰藏在 Worker。
@@ -119,7 +119,7 @@ python3 -m http.server 8000
 ## 技術說明（給之後想維護的人）
 - 單檔 `index.html`，內含 HTML / CSS / vanilla JavaScript，無任何相依套件或 CDN。
 - 所有資料存在 `localStorage` 的 `eat-what-data` 這個 key，結構為單一 JSON 物件：
-  `{ version, stores[], tagOptions, log[], settings }`。店家**不存座標**（算距離時即時取得、用完即丟，只留級距）；`settings.home` 是距離基準點。
+  `{ version, stores[], tagOptions, log[], settings }`。店家**不存座標**（算距離時即時取得、用完即丟，只留級距）；`settings.homes` 是你存的地址（最多 3 組）、`settings.activeHomeId` 是目前所在，每間店各地址的距離存在 `distByHome`。
 - **距離查詢**：前端 `googleGeocode()` 打 `DISTANCE_PROXY`（`index.html` 最上面的常數，填你的 Worker 網址）；Worker（見 `worker.js`）持金鑰、再打 Google Places API (New) 的 `searchText`，回傳 `{result:{lat,lng,name}}`。金鑰只在 Worker、不在前端。
 - **距離換算**集中在 `estimateDriveMinutes(home, s)`：目前回傳「直線公里 × `MIN_PER_KM`」，要換**實際車程**只改這個函式（改成 `await` 呼叫 OSRM `router.project-osrm.org/route/v1/driving/...` 取 `duration/60`，或 OpenRouteService），其他都不用動——檔案裡有註解範例。
 - **AI 分類**：前端 `aiClassify()` 打同一個 Worker（body 帶 `op:"classify"`）；Worker 用 OpenAI Responses API（`web_search` 工具）查證後回傳**限定在合法標籤內**的 `{staple,cuisine,meals,price}`。只存推論出的標籤、不存查到的原始內容。

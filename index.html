@@ -366,6 +366,39 @@
   .citychip.on{ background:var(--grad); border-color:transparent; color:#fff; box-shadow:0 4px 12px rgba(255,86,48,.3); }
   .citychip.on small{ color:rgba(255,255,255,.85); }
   .citychip.off{ opacity:.4; cursor:not-allowed; }
+  /* 抽選頁：目前地址列 */
+  #homeBar{margin:0 0 10px;}
+  .homebar{display:flex; align-items:center; gap:8px; width:100%; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:9px 14px; cursor:pointer; font-family:inherit; color:var(--text); font-size:14px; font-weight:600; box-shadow:var(--sh-sm);}
+  .homebar:active{transform:scale(.99);}
+  .homebar .hb-ic{display:flex; color:var(--brand);}
+  .homebar .hb-ic svg{width:17px; height:17px;}
+  .homebar .hb-label{flex:1; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .homebar .hb-act{flex:0 0 auto; color:var(--brand); font-weight:700; font-size:13px;}
+  .homebar.nohome{color:var(--muted);}
+  .homebar.nohome .hb-ic{color:var(--muted);}
+  /* 設定：地址清單 */
+  #homesList{margin:2px 0 4px;}
+  .addr-row{display:flex; align-items:center; gap:10px; padding:10px 2px; border-top:1px solid var(--line);}
+  .addr-row:first-child{border-top:none;}
+  .addr-ic{display:flex; color:var(--muted);}
+  .addr-ic svg{width:18px; height:18px;}
+  .addr-row.on .addr-ic{color:var(--brand);}
+  .addr-tx{flex:1; min-width:0;}
+  .addr-label{font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .addr-badge{font-size:12px; color:var(--brand); font-weight:700; margin-top:2px;}
+  .addr-use{font-size:13px; color:var(--muted); background:none; border:none; padding:2px 0; cursor:pointer; font-family:inherit; margin-top:2px; text-decoration:underline;}
+  .addr-del{flex:0 0 auto; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:4px 8px; line-height:1; border-radius:8px;}
+  .addr-del:active{background:var(--line);}
+  /* 地址切換 popup */
+  .hs-row{display:flex; align-items:center; gap:11px; width:100%; padding:13px 6px; border:none; border-top:1px solid var(--line); background:none; cursor:pointer; font-family:inherit; color:var(--text);}
+  .hs-row:first-child{border-top:none;}
+  .hs-row.on{color:var(--brand); font-weight:700;}
+  .hs-row .hs-ic{display:flex; color:var(--muted);}
+  .hs-row.on .hs-ic{color:var(--brand);}
+  .hs-row .hs-ic svg{width:18px; height:18px;}
+  .hs-label{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left; font-size:15px;}
+  .hs-check{flex:0 0 auto; display:flex; color:var(--brand);}
+  .hs-check svg{width:18px; height:18px;}
 </style>
 </head>
 <body class="tab-home">
@@ -377,6 +410,7 @@
 
 <!-- 決定 -->
 <section id="view-home" class="view active">
+  <div id="homeBar"></div>
   <div id="homeHint"></div>
   <div class="toprow"><div class="fglabel" style="margin:0">今天的條件</div><button class="linkbtn" id="clearFilters" style="margin-left:auto">清除條件</button></div>
   <div id="filters"></div>
@@ -462,7 +496,7 @@ const VOTE_LABEL = {like:"喜歡", ok:"普通", no:"不喜歡"};
 // （已移除預設位置：家的位置預設為「未設定」，要先設定才能用自動算距離）
 function defaults(){
   return {version:1, stores:[], tagOptions:JSON.parse(JSON.stringify(DEFAULT_TAGS)),
-    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, solo:false, theme:"auto", user1:"我", user2:"伴侶/朋友", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, home:{label:"", lat:null, lng:null, area:""}}};
+    log:[], settings:{avoidRecent:true, avoidWindow:5, animation:true, openMaps:true, excludeDisliked:false, chainNearest:true, solo:false, theme:"auto", user1:"我", user2:"伴侶/朋友", googleKey:"", homeSet:false, homeHintDismissed:false, drawIntroSeen:false, homes:[], activeHomeId:"", home:{label:"", lat:null, lng:null, area:""}}};
 }
 function uid(){ return (crypto.randomUUID && crypto.randomUUID()) || ("id-"+Date.now()+"-"+Math.random().toString(36).slice(2)); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
@@ -496,6 +530,7 @@ function normStore(s){
     cuisine: migrateCuisine(toArr(pick("cuisine","菜系")), String(pick("name","餐廳","店名")||"").trim()),
     meals: toArr(pick("meals","餐別")),
     distance: migrateDistance(toStr(pick("distance","距離"))),
+    distByHome: (s.distByHome && typeof s.distByHome==="object") ? s.distByHome : {},
     price: toStr(pick("price","價位")),
     location: String(pick("location","地址","地點")||""),
     note: String(pick("note","備註")||""),
@@ -531,6 +566,24 @@ function normalize(d){
   out.settings.solo = !!out.settings.solo;
   out.settings.theme = ["auto","light","dark"].indexOf(out.settings.theme)>=0 ? out.settings.theme : "auto";
   out.settings.avoidWindow = clamp(parseInt(out.settings.avoidWindow)||5, 1, 20);
+  // 多地址遷移：舊的單一 home → homes 陣列；每間店的距離改存各地址快取 distByHome
+  var savedHomes = d.settings && d.settings.homes;
+  if(Array.isArray(savedHomes) && savedHomes.length){
+    out.settings.homes = savedHomes.map(function(h){ return {id:String((h&&h.id)||uid()), label:String((h&&h.label)||""), lat:numOrNull(h&&h.lat), lng:numOrNull(h&&h.lng), area:String((h&&h.area)||"")}; }).filter(function(h){ return h.lat!=null; }).slice(0,3);
+  } else {
+    out.settings.homes = [];
+    if(out.settings.home && out.settings.home.lat!=null){
+      var _mid = uid();
+      out.settings.homes.push({id:_mid, label:out.settings.home.label, lat:out.settings.home.lat, lng:out.settings.home.lng, area:out.settings.home.area});
+      out.stores.forEach(function(s){ if(s.distance){ if(!s.distByHome[_mid]) s.distByHome[_mid]=s.distance; } });
+    }
+  }
+  var _sa = d.settings && d.settings.activeHomeId;
+  out.settings.activeHomeId = (_sa && out.settings.homes.some(function(h){return h.id===_sa;})) ? _sa : (out.settings.homes[0] ? out.settings.homes[0].id : "");
+  var _ah = out.settings.homes.filter(function(h){return h.id===out.settings.activeHomeId;})[0] || null;
+  out.settings.home = _ah ? {label:_ah.label, lat:_ah.lat, lng:_ah.lng, area:_ah.area} : {label:"", lat:null, lng:null, area:""};
+  out.settings.homeSet = !!_ah;
+  out.stores.forEach(function(s){ s.distance = _ah ? (s.distByHome[out.settings.activeHomeId]||"") : ""; });
   return out;
 }
 function load(){
@@ -735,6 +788,7 @@ function updateCount(){
   el.classList.toggle("zero", n===0 && state.stores.length>0);
 }
 function renderHome(){
+  renderHomeBar();
   renderHomeHint();
   renderFilters();
   $("#avoidToggle").checked = state.settings.avoidRecent;
@@ -931,7 +985,7 @@ function renderStores(){
 
 /* ---------- 店家表單 ---------- */
 let formStore=null, editingId=null;
-function blankStore(){ return {id:"",name:"",staple:[],cuisine:[],meals:[],distance:"",price:"",location:"",note:"",votes:["",""]}; }
+function blankStore(){ return {id:"",name:"",staple:[],cuisine:[],meals:[],distance:"",distByHome:{},price:"",location:"",note:"",votes:["",""]}; }
 function openForm(store){
   editingId = store ? store.id : null;
   formStore = store ? JSON.parse(JSON.stringify(store)) : blankStore();
@@ -960,6 +1014,8 @@ function saveForm(){
   formStore.location = $("#f-location").value||"";
   formStore.note = $("#f-note").value||"";
   if(!formStore.name){ alert("請輸入店名"); $("#f-name").focus(); return; }
+  var _aid=state.settings.activeHomeId;
+  if(_aid){ if(!formStore.distByHome) formStore.distByHome={}; if(formStore.distance) formStore.distByHome[_aid]=formStore.distance; else delete formStore.distByHome[_aid]; }
   formStore.updatedAt = Date.now();
   if(editingId){
     const i = state.stores.findIndex(s=>s.id===editingId);
@@ -1017,9 +1073,10 @@ function renderSettings(){
 
     <div class="sect" id="onb-auto">
       <h2>自動填寫（需網路）</h2>
-      <div class="row"><div class="lbl">家的位置<small>距離的基準點｜${st.homeSet?("目前："+esc((st.home&&st.home.label)||"")):"<span class='hh-warn'>尚未設定（設定後才能自動算距離）</span>"}</small></div></div>
-      <div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="搜尋住家地址或附近地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">查詢</button></div>
-      <div class="row"><div class="lbl">一鍵自動算距離<small>${st.home&&st.home.lat!=null?"自動幫「還沒填距離」的店估算距離；找不到的會略過":"<span class='hh-warn'>請先在上面設定「家的位置」</span>"}</small></div><button class="btn ghost" id="btn-autodist"${st.home&&st.home.lat!=null?"":" disabled"}>開始</button></div>
+      <div class="row"><div class="lbl">我的地址<small>最多 3 組；切換「目前所在」距離會跟著換，算過的會保存起來</small></div></div>
+      <div id="homesList"></div>
+      ${(st.homes&&st.homes.length>=3) ? '<div class="ver" style="text-align:left;margin:2px 2px 6px">已達 3 組上限，移除一組才能再新增。</div>' : '<div class="row" style="gap:8px"><input class="nameinput" id="set-homeq" style="flex:1; width:auto" placeholder="新增地址：搜尋地址或地標（例：嶺東科技大學）"><button class="btn ghost" id="btn-homeset" style="flex:0 0 auto">新增</button></div>'}
+      <div class="row"><div class="lbl">一鍵自動算距離<small>${st.home&&st.home.lat!=null?"幫『目前地址』還沒算距離的店估算；找不到的會略過":"<span class='hh-warn'>請先在上面新增/選擇地址</span>"}</small></div><button class="btn ghost" id="btn-autodist"${st.home&&st.home.lat!=null?"":" disabled"}>開始</button></div>
       <div class="row"><div class="lbl">一鍵自動分類（AI 判讀）<small>自動幫「還沒分類」的店填主食／菜系／餐別／價位（不含距離）；填完建議檢查一下</small></div><button class="btn ghost" id="btn-autoclass">開始</button></div>
       <div class="ver" style="text-align:left;margin:6px 2px 2px">距離與分類為自動估算，僅供參考。導航由 Google 地圖提供。</div>
     </div>
@@ -1068,6 +1125,7 @@ function renderSettings(){
   if($("#set-solo")) $("#set-solo").onchange = e=>{ state.settings.solo=e.target.checked; save(); renderSettings(); renderStores(); if(currentTab==="home") renderHome(); };
   if($("#themeCtl")) $("#themeCtl").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.settings.theme=b.dataset.theme; save(); applyTheme(); renderSettings(); });
   if($("#btn-homeset")) $("#btn-homeset").onclick = setHomeFromInput;
+  renderHomesList();
   if($("#btn-tour")) $("#btn-tour").onclick = function(){ startTour(); };
   if($("#btn-autodist")) $("#btn-autodist").onclick = autoFillDistances;
   if($("#btn-autoclass")) $("#btn-autoclass").onclick = autoClassify;
@@ -1440,19 +1498,90 @@ function authHint(e){ return (e&&e.code==="AUTH")
   ? "服務暫時無法使用，請稍後再試。"
   : "連線失敗，請檢查網路後再試。"; }
 
+/* ---------- 多地址（最多 3 組；每個地址各自的距離快取 distByHome） ---------- */
+var PIN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+function homesList(){ if(!Array.isArray(state.settings.homes)) state.settings.homes=[]; return state.settings.homes; }
+function activeHome(){ var id=state.settings.activeHomeId; return homesList().filter(function(h){return h.id===id;})[0] || null; }
+function applyActiveHome(){
+  var h=activeHome(), id=state.settings.activeHomeId;
+  state.settings.home = h ? {label:h.label, lat:h.lat, lng:h.lng, area:h.area} : {label:"", lat:null, lng:null, area:""};
+  state.settings.homeSet = !!h;
+  state.stores.forEach(function(s){ if(!s.distByHome||typeof s.distByHome!=="object") s.distByHome={}; s.distance = h ? (s.distByHome[id]||"") : ""; });
+}
+function setActiveHome(id){
+  state.settings.activeHomeId = id || "";
+  applyActiveHome(); save();
+  renderStores(); renderSettings(); renderHomeBar(); if(currentTab==="home") renderHome();
+}
+function addHome(g, q){
+  var homes=homesList();
+  if(homes.length>=3) return null;
+  var id=uid();
+  homes.push({id:id, label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""});
+  state.settings.activeHomeId=id; applyActiveHome(); save();
+  return id;
+}
+function removeHome(id){
+  state.settings.homes = homesList().filter(function(h){return h.id!==id;});
+  state.stores.forEach(function(s){ if(s.distByHome) delete s.distByHome[id]; });
+  if(state.settings.activeHomeId===id) state.settings.activeHomeId = state.settings.homes.length ? state.settings.homes[0].id : "";
+  applyActiveHome(); save();
+}
+function shortLabel(s){ s=String(s||""); return s.length>18 ? s.slice(0,17)+"…" : s; }
+function renderHomeBar(){
+  var el=$("#homeBar"); if(!el) return;
+  var homes=homesList(), h=activeHome();
+  if(!homes.length){
+    el.innerHTML='<button class="homebar nohome" id="homeBarBtn"><span class="hb-ic">'+PIN_SVG+'</span><span class="hb-label">尚未設定地址</span><span class="hb-act">去設定</span></button>';
+    $("#homeBarBtn").onclick=gotoHomeSetting; return;
+  }
+  el.innerHTML='<button class="homebar" id="homeBarBtn"><span class="hb-ic">'+PIN_SVG+'</span><span class="hb-label">目前在：'+esc(shortLabel(h?h.label:""))+'</span>'+(homes.length>1?'<span class="hb-act">切換 ▾</span>':'<span class="hb-act">管理</span>')+'</button>';
+  $("#homeBarBtn").onclick = (homes.length>1)?openHomeSwitch:gotoHomeSetting;
+}
+function openHomeSwitch(){ renderHomeSwitchList(); showModal("#homeSwitchModal"); }
+function renderHomeSwitchList(){
+  var el=$("#homeSwitchList"); if(!el) return;
+  var homes=homesList(), aid=state.settings.activeHomeId;
+  el.innerHTML = homes.map(function(h){
+    var on=h.id===aid;
+    return '<button class="hs-row'+(on?' on':'')+'" data-home="'+h.id+'"><span class="hs-ic">'+PIN_SVG+'</span><span class="hs-label">'+esc(h.label||"(未命名)")+'</span>'+(on?'<span class="hs-check">'+CHECK_SVG+'</span>':'')+'</button>';
+  }).join("");
+  el.querySelectorAll(".hs-row").forEach(function(b){ b.onclick=function(){ setActiveHome(b.dataset.home); hideModal("#homeSwitchModal"); }; });
+}
+function renderHomesList(){
+  var el=$("#homesList"); if(!el) return;
+  var homes=homesList(), aid=state.settings.activeHomeId;
+  if(!homes.length){ el.innerHTML='<div class="ver" style="text-align:left;margin:2px 2px 8px"><span class="hh-warn">尚未設定地址（設定後才能自動算距離）</span></div>'; return; }
+  el.innerHTML = homes.map(function(h){
+    var on=h.id===aid;
+    return '<div class="addr-row'+(on?' on':'')+'"><span class="addr-ic">'+PIN_SVG+'</span><div class="addr-tx"><div class="addr-label">'+esc(h.label||"(未命名)")+'</div>'+(on?'<div class="addr-badge">目前使用中</div>':'<button class="addr-use" data-use="'+h.id+'">設為目前所在</button>')+'</div><button class="addr-del" data-del="'+h.id+'" aria-label="移除">✕</button></div>';
+  }).join("");
+  el.querySelectorAll(".addr-use").forEach(function(b){ b.onclick=function(){ setActiveHome(b.dataset.use); }; });
+  el.querySelectorAll(".addr-del").forEach(function(b){ b.onclick=function(){ var h=homesList().filter(function(x){return x.id===b.dataset.del;})[0]; if(h && confirm("移除地址「"+h.label+"」？\n（這個地址算過的距離也會一起清除）")){ removeHome(b.dataset.del); renderSettings(); renderHomeBar(); renderHomeHint(); if(currentTab==="home") renderHome(); } }; });
+}
+(function buildHomeSwitch(){
+  var m=document.createElement("div"); m.className="modal"; m.id="homeSwitchModal";
+  m.innerHTML='<div class="sheet"><h2 class="title">目前所在地址</h2><p class="city-desc">切換後，距離標籤會換成這個地址算過的結果（算過就會保存，不用重算）。</p><div id="homeSwitchList"></div><div class="formbtns"><button class="btn ghost" id="hsManage">管理地址</button><button class="btn primary" id="hsClose">完成</button></div></div>';
+  document.body.appendChild(m);
+  m.addEventListener("click", function(e){ if(e.target===m) hideModal("#homeSwitchModal"); });
+  $("#hsClose").onclick=function(){ hideModal("#homeSwitchModal"); };
+  $("#hsManage").onclick=function(){ hideModal("#homeSwitchModal"); gotoHomeSetting(); };
+})();
 async function setHomeFromInput(){
   const q = ($("#set-homeq").value||"").trim();
-  if(!q){ alert("請先輸入住家地址或附近地標。"); return; }
+  if(!q){ alert("請先輸入地址或附近地標。"); return; }
+  if(homesList().length>=3){ alert("最多只能存 3 組地址，請先移除一組。"); return; }
   if(!proxyReady()){ alert("此功能暫時無法使用，請稍後再試。"); return; }
   const btn=$("#btn-homeset"); if(btn){ btn.disabled=true; btn.textContent="查詢中…"; }
   try{
-    const g = await googleGeocode(q, state.settings.home, true);
+    const g = await googleGeocode(q, activeHome(), true);
     if(!g){ alert("查不到這個地點，換個地標或地址再試。"); return; }
-    state.settings.home = {label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""};
-    state.settings.homeSet = true;
-    save(); renderSettings(); renderHomeHint(); toast("已設定家的位置");
+    addHome(g, q);
+    renderSettings(); renderHomeBar(); renderHomeHint(); toast("已新增並切換到這個地址");
+    setTimeout(autoFillDistances, 80);
   }catch(e){ alert(e&&e.code==="NOPROXY" ? "此功能暫時無法使用。" : authHint(e)); }
-  finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="查詢"; } }
+  finally{ const b=$("#btn-homeset"); if(b){ b.disabled=false; b.textContent="新增"; } }
 }
 
 async function autoFillDistances(){
@@ -1473,7 +1602,7 @@ async function autoFillDistances(){
       if(!g){ problems.push(s.name); continue; }
       const bucket = await distanceBucketFor(home, {lat:g.lat, lng:g.lng}); // 算完即丟座標
       if(!bucket){ problems.push(s.name); continue; }
-      s.distance = bucket; s.updatedAt=Date.now(); filled++;
+      s.distance = bucket; if(state.settings.activeHomeId){ if(!s.distByHome) s.distByHome={}; s.distByHome[state.settings.activeHomeId]=bucket; } s.updatedAt=Date.now(); filled++;
       await sleep(120);
     }catch(e){
       if(e && (e.code==="AUTH"||e.code==="NOPROXY")){ aborted=e; break; }
@@ -1774,8 +1903,7 @@ async function runOnboardAddress(){
     if(!proxyReady()) throw {code:"NOPROXY"};
     var g = await googleGeocode(q, state.settings.home, true);
     if(!g){ status.className="onb-status err"; status.textContent="查不到這個地點，換個地標或地址再試一次。"; go.disabled=false; inp.disabled=false; skip.style.visibility=""; return; }
-    state.settings.home = {label:(g.name||q)+(g.area?("，"+g.area):""), lat:g.lat, lng:g.lng, area:g.area||""};
-    state.settings.homeSet=true; save();
+    addHome(g, q);
     var todo = state.stores.filter(function(s){ return !s.distance; });
     var unlocked = await requireUnlock("distance");
     if(unlocked && todo.length){
@@ -1800,7 +1928,7 @@ async function onboardAutoDistances(todo, onProgress){
       var s = todo[idx++];
       try{
         var g = await googleGeocode(s.name, home);
-        if(g){ var bucket = await distanceBucketFor(home, {lat:g.lat, lng:g.lng}); if(bucket){ s.distance=bucket; s.updatedAt=Date.now(); } }
+        if(g){ var bucket = await distanceBucketFor(home, {lat:g.lat, lng:g.lng}); if(bucket){ s.distance=bucket; if(state.settings.activeHomeId){ if(!s.distByHome) s.distByHome={}; s.distByHome[state.settings.activeHomeId]=bucket; } s.updatedAt=Date.now(); } }
       }catch(e){}
       done++; if(onProgress) onProgress(done);
     }
